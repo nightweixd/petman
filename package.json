@@ -1,28 +1,48 @@
 {
-  "name": "petman-app",
-  "version": "1.0.0",
+  "name": "petman",
+  "version": "2.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "next build --webpack && wrangler dev",
+    "deploy": "next build --webpack && wrangler deploy",
+    "build": "next build --webpack && wrangler deploy --dry-run",
+    "types": "wrangler types --include-runtime=false --strict-vars=false",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "db:local": "wrangler d1 migrations apply DB --local",
+    "db:remote": "wrangler d1 migrations apply DB --remote",
+    "dev:api": "wrangler dev",
+    "build:web": "next build --webpack",
+    "format": "prettier --write \"src/**/*.ts\" \"lib/**/*.ts\" \"pages/**/*.tsx\" \"tests/*.mjs\""
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
-    "next": "14.1.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "@better-auth/drizzle-adapter": "1.7.12",
+    "better-auth": "1.7.12",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.13",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/react": "^18.2.48",
-    "@types/react-dom": "^18.2.18",
-    "autoprefixer": "^10.4.17",
-    "eslint": "^8.56.0",
-    "eslint-config-next": "14.1.0",
-    "postcss": "^8.4.33",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.3.3"
+    "@cloudflare/workers-types": "5.20261025.1",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "autoprefixer": "10.6.1",
+    "postcss": "8.5.31",
+    "prettier": "3.9.10",
+    "tailwindcss": "3.4.19",
+    "typescript": "7.0.2",
+    "wrangler": "4.152.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "overrides": {
+    "postcss-selector-parser": "7.1.7",
+    "undici": "8.12.3"
   }
 }
