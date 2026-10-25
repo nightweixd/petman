@@ -21,7 +21,8 @@ const date = z
 export const bookingSchema = z.object({
   serviceId: z.string().max(100),
   date,
-  slot: z.enum(slots as [string, ...string[]]),
+  slot: z.string().regex(/^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/),
+  groomerId: z.string().max(100).optional(),
   name: z.string().trim().min(1).max(100),
   phone: z
     .string()
@@ -55,7 +56,7 @@ export function validSlot(day: string, slot: string, timezone: string) {
   return (
     days >= 0 &&
     days <= 90 &&
-    slots.includes(slot) &&
+    /^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/.test(slot) &&
     (day !== today || slot > `${parts.hour}:${parts.minute}`)
   );
 }
@@ -64,11 +65,12 @@ export async function transitionBooking(
   actor: string,
   input: unknown,
 ) {
-  const { id, status, customerId } = z
+  const { id, status, customerId, petId } = z
     .object({
       id: z.string().uuid(),
       status: z.enum(["confirmed", "completed", "cancelled"]),
       customerId: z.string().uuid().optional(),
+      petId: z.string().uuid().optional(),
     })
     .parse(input);
   const booking = await db
@@ -89,11 +91,11 @@ export async function transitionBooking(
   const statements: D1PreparedStatement[] = [];
   if (status === "confirmed" && booking.status === "pending") {
     const customer = customerId ?? crypto.randomUUID(),
-      pet = crypto.randomUUID();
+      pet = petId ?? crypto.randomUUID();
     if (
       customerId &&
       !(await db
-        .prepare("SELECT id FROM customers WHERE id=?")
+        .prepare("SELECT id FROM customers WHERE id=? AND archived_at IS NULL")
         .bind(customer)
         .first())
     )
@@ -106,20 +108,30 @@ export async function transitionBooking(
           )
           .bind(customer, "WEB-" + customer.slice(0, 8), details.name),
       );
-    statements.push(
-      db
-        .prepare(
-          "INSERT INTO pets(id,customer_id,pet_name,pet_type,contact,birthday) VALUES(?,?,?,?,?,?)",
-        )
-        .bind(
-          pet,
-          customer,
-          details.petName,
-          details.petType,
-          details.phone,
-          details.petBirthday ?? null,
-        ),
-    );
+    if (
+      petId &&
+      (!customerId ||
+        !(await db
+          .prepare("SELECT id FROM pets WHERE id=? AND customer_id=?")
+          .bind(petId, customerId)
+          .first()))
+    )
+      throw new Error("Pet does not belong to this customer");
+    if (!petId)
+      statements.push(
+        db
+          .prepare(
+            "INSERT INTO pets(id,customer_id,pet_name,pet_type,contact,birthday) VALUES(?,?,?,?,?,?)",
+          )
+          .bind(
+            pet,
+            customer,
+            details.petName,
+            details.petType,
+            details.phone,
+            details.petBirthday ?? null,
+          ),
+      );
     // A guest submission must never overwrite existing identity or membership details.
     statements.push(
       db
@@ -167,7 +179,7 @@ export async function transitionBooking(
   } else if (
     status === "cancelled" &&
     ["pending", "confirmed"].includes(booking.status)
-  )
+  ) {
     statements.push(
       db
         .prepare(
@@ -175,7 +187,10 @@ export async function transitionBooking(
         )
         .bind(id),
     );
-  else throw new Error("Invalid booking transition");
+    statements.push(
+      db.prepare("DELETE FROM booking_occupancy WHERE booking_id=?").bind(id),
+    );
+  } else throw new Error("Invalid booking transition");
   // One transition from each state: competing staff actions roll back atomically.
   statements.unshift(
     db

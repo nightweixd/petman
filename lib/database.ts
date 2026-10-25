@@ -23,6 +23,8 @@ class Query implements PromiseLike<Result> {
     rows?: Row[];
     values?: Row;
     single: boolean;
+    limit?: number;
+    offset?: number;
   };
   constructor(table: string) {
     this.request = {
@@ -69,6 +71,15 @@ class Query implements PromiseLike<Result> {
   }
   single() {
     this.request.single = true;
+    return this;
+  }
+  range(from: number, to: number) {
+    this.request.offset = from;
+    this.request.limit = to - from + 1;
+    return this;
+  }
+  limit(n: number) {
+    this.request.limit = n;
     return this;
   }
   async run(): Promise<Result> {

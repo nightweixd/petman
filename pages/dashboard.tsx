@@ -429,7 +429,7 @@ export default function DashboardPage({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard
             icon="💰"
-            label="Total revenue"
+            label="Recorded visit value"
             value={`RM ${stats?.totalRevenue.toFixed(0) ?? 0}`}
             sub={`RM ${stats?.revenueThisMonth.toFixed(0) ?? 0} this ${currentMonth}`}
           />

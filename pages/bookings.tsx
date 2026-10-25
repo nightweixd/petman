@@ -44,6 +44,10 @@ export default function Bookings() {
     [customers, setCustomers] = useState<Customer[]>([]),
     [services, setServices] = useState<Service[]>([]),
     [matches, setMatches] = useState<Record<string, string>>({}),
+    [petMatches, setPetMatches] = useState<Record<string, string>>({}),
+    [matchingPets, setMatchingPets] = useState<
+      { id: string; pet_name: string }[]
+    >([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   async function load() {
@@ -71,6 +75,7 @@ export default function Bookings() {
         id: b.id,
         status,
         ...(matches[b.id] ? { customerId: matches[b.id] } : {}),
+        ...(petMatches[b.id] ? { petId: petMatches[b.id] } : {}),
       });
       await load();
       return true;
@@ -355,9 +360,19 @@ export default function Bookings() {
                 Membership record
                 <select
                   value={matches[selected.id] ?? ""}
-                  onChange={(e) =>
-                    setMatches((m) => ({ ...m, [selected.id]: e.target.value }))
-                  }
+                  onChange={async (e) => {
+                    const customerId = e.target.value;
+                    setMatches((m) => ({ ...m, [selected.id]: customerId }));
+                    setPetMatches((m) => ({ ...m, [selected.id]: "" }));
+                    setMatchingPets([]);
+                    if (customerId) {
+                      const r = await database
+                        .from("pets")
+                        .select("id,pet_name")
+                        .eq("customer_id", customerId);
+                      if (!r.error) setMatchingPets(r.data ?? []);
+                    }
+                  }}
                 >
                   <option value="">Create a new customer and membership</option>
                   {customers.map((c) => (
@@ -367,8 +382,36 @@ export default function Bookings() {
                   ))}
                 </select>
                 <small>
-                  Verify identity before linking an existing customer. A new pet
-                  record will be added.
+                  Verify identity before linking an existing customer, then
+                  select their pet below.
+                </small>
+              </label>
+            )}
+            {selected.status === "pending" && matches[selected.id] && (
+              <label>
+                Pet record
+                <select
+                  value={petMatches[selected.id] ?? ""}
+                  onChange={(e) =>
+                    setPetMatches((m) => ({
+                      ...m,
+                      [selected.id]: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Create a new pet</option>
+                  {matchingPets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.pet_name}
+                      {p.pet_name.toLowerCase() ===
+                      selected.details.petName.toLowerCase()
+                        ? " · name matches"
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+                <small>
+                  Choose an existing pet to keep its visit history together.
                 </small>
               </label>
             )}
@@ -430,13 +473,11 @@ export default function Bookings() {
               const form = e.currentTarget,
                 f = new FormData(form);
               setBusy(true);
-              const r = await database
-                .from("services")
-                .insert({
-                  name: String(f.get("name")),
-                  description: String(f.get("description")),
-                  price_cents: Math.round(Number(f.get("price")) * 100),
-                });
+              const r = await database.from("services").insert({
+                name: String(f.get("name")),
+                description: String(f.get("description")),
+                price_cents: Math.round(Number(f.get("price")) * 100),
+              });
               if (r.error) setError(r.error.message);
               else {
                 form.reset();
@@ -468,8 +509,8 @@ export default function Bookings() {
               </label>
             ))}
             <p className="pm-form-note">
-              Each package uses a one-hour slot. Discounts and payments are
-              handled by staff.
+              Set durations and buffers in Salon settings. Discounts and
+              payments are handled by staff.
             </p>
             {error && (
               <p className="pm-inline-error" role="alert">

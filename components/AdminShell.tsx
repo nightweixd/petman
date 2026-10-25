@@ -20,6 +20,15 @@ const navigation: {
     href: "/?section=dashboard",
   },
   { id: "list", label: "Customers", icon: "users", href: "/" },
+  { id: "today", label: "Day board", icon: "clock", href: "/today" },
+  { id: "care", label: "Customer care", icon: "mail", href: "/care" },
+  { id: "invoices", label: "Invoices", icon: "wallet", href: "/invoices" },
+  {
+    id: "schedule",
+    label: "Salon settings",
+    icon: "settings",
+    href: "/schedule",
+  },
   { id: "bookings", label: "Bookings", icon: "calendar", href: "/bookings" },
   {
     id: "members",
@@ -44,9 +53,11 @@ const navigation: {
 export default function AdminShell({
   children,
   session,
+  staffRole = "owner",
 }: {
   children: ReactNode;
   session: Session;
+  staffRole?: string;
 }) {
   const { view, setView } = useContext(AdminNavigation),
     router = useRouter(),
@@ -77,35 +88,51 @@ export default function AdminShell({
         </Link>
         <span className="pm-rail-rule" />
         <nav>
-          {navigation.map((n) => (
-            <Link
-              href={n.href}
-              key={n.id}
-              title={n.label}
-              aria-label={n.label}
-              aria-current={active === n.id ? "page" : undefined}
-              className={`pm-nav-link ${active === n.id ? "is-active" : ""}`}
-              onClick={() => {
-                setExpanded(false);
-                setView(n.id);
-              }}
-            >
-              <Icon name={n.icon} />
-              <span>{n.label}</span>
-            </Link>
-          ))}
+          {navigation
+            .filter(
+              (n) =>
+                staffRole === "owner" ||
+                (staffRole === "groomer"
+                  ? n.id === "today"
+                  : ![
+                      "backup",
+                      "deleted",
+                      "schedule",
+                      "accounts",
+                      "dashboard",
+                    ].includes(n.id)),
+            )
+            .map((n) => (
+              <Link
+                href={n.href}
+                key={n.id}
+                title={n.label}
+                aria-label={n.label}
+                aria-current={active === n.id ? "page" : undefined}
+                className={`pm-nav-link ${active === n.id ? "is-active" : ""}`}
+                onClick={() => {
+                  setExpanded(false);
+                  setView(n.id);
+                }}
+              >
+                <Icon name={n.icon} />
+                <span>{n.label}</span>
+              </Link>
+            ))}
         </nav>
         <div className="pm-rail-bottom">
-          <Link
-            href="/staff"
-            title="Users & permissions"
-            aria-label="Users & permissions"
-            aria-current={active === "staff" ? "page" : undefined}
-            className={`pm-nav-link ${active === "staff" ? "is-active" : ""}`}
-          >
-            <Icon name="settings" />
-            <span>Users & permissions</span>
-          </Link>
+          {staffRole === "owner" && (
+            <Link
+              href="/staff"
+              title="Users & permissions"
+              aria-label="Users & permissions"
+              aria-current={active === "staff" ? "page" : undefined}
+              className={`pm-nav-link ${active === "staff" ? "is-active" : ""}`}
+            >
+              <Icon name="settings" />
+              <span>Users & permissions</span>
+            </Link>
+          )}
           <button
             className="pm-nav-link"
             title="Sign out"
@@ -159,7 +186,13 @@ export default function AdminShell({
             <span className="pm-topbar-divider" />
             <span className="pm-user-name">
               {session.user.name}
-              <small>Administrator</small>
+              <small>
+                {staffRole === "owner"
+                  ? "Owner"
+                  : staffRole === "groomer"
+                    ? "Groomer"
+                    : "Receptionist"}
+              </small>
             </span>
             <Link
               className="pm-profile"

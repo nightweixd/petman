@@ -6,6 +6,7 @@ type User = {
   email: string;
   full_name: string;
   role: string;
+  staff_role: string;
   is_active: number;
 };
 async function request(path: string, body?: unknown) {
@@ -51,7 +52,7 @@ export default function Staff() {
             onClick={() => setCreating(true)}
           >
             <Icon name="plus" size={16} />
-            Add administrator
+            Add staff member
           </button>
         </div>
         {error && (
@@ -87,7 +88,7 @@ export default function Staff() {
                       </span>
                     </div>
                   </td>
-                  <td>{u.role === "admin" ? "Administrator" : "Customer"}</td>
+                  <td>{u.role === "admin" ? u.staff_role : "Customer"}</td>
                   <td>
                     <span
                       className={
@@ -130,7 +131,8 @@ export default function Staff() {
         </div>
         <div className="pm-table-footer">
           <span>
-            Admins have full salon access. Customers see their own records.
+            Owners manage the system. Receptionists manage customer care and
+            invoices. Groomers use the day board.
           </span>
           <a className="pm-text-button" href="/?section=accounts">
             Create customer login
@@ -142,7 +144,7 @@ export default function Staff() {
       </div>
       {creating && (
         <Drawer
-          title="New administrator"
+          title="New staff member"
           eyebrow="Users & permissions"
           onClose={() => setCreating(false)}
         >
@@ -171,9 +173,19 @@ export default function Staff() {
             }}
           >
             <p>
-              This account will have full access to salon records. Share the
-              initial password privately.
+              Choose the access this person needs. Share the initial password
+              privately.
             </p>
+            <label>
+              Staff role
+              <select name="staffRole" defaultValue="receptionist">
+                <option value="receptionist">
+                  Receptionist · customers, bookings and invoices
+                </option>
+                <option value="groomer">Groomer · day board</option>
+                <option value="owner">Owner · full access</option>
+              </select>
+            </label>
             {[
               ["name", "Full name", "text"],
               ["email", "Email address", "email"],
@@ -214,7 +226,7 @@ export default function Staff() {
     </div>
   );
 }
-function PasswordForm() {
+export function PasswordForm() {
   const [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
   return (

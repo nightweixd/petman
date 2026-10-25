@@ -27,9 +27,15 @@ export default function Book() {
   useEffect(() => {
     setSlot("");
     setSlots([]);
-    if (!date) return;
+    if (!date || !serviceId) return;
     const controller = new AbortController();
-    fetch("/api/public/slots?date=" + date, { signal: controller.signal })
+    fetch(
+      "/api/public/slots?date=" +
+        date +
+        "&serviceId=" +
+        encodeURIComponent(serviceId),
+      { signal: controller.signal },
+    )
       .then(async (r) => {
         if (!r.ok) throw new Error("Unable to load slots");
         return (await r.json()) as { slots: string[]; timezone: string };
@@ -42,7 +48,7 @@ export default function Book() {
         if (e.name !== "AbortError") setError(e.message);
       });
     return () => controller.abort();
-  }, [date]);
+  }, [date, serviceId]);
   const field = "block w-full border border-stone-300 rounded-lg p-3 mt-1";
   return (
     <main className="min-h-screen bg-teal-50 px-4 py-10">

@@ -6,14 +6,10 @@ import { createAuth } from "./auth";
 import { executeQuery } from "./data";
 import { bookingSchema, slots, validSlot, transitionBooking } from "./booking";
 import { exportRecords, importRecords } from "./backup";
+import workspace from "./workspace";
+import { can, type Profile } from "./permissions";
+import { availability, quarterSlots } from "./scheduling";
 
-type Profile = {
-  id: string;
-  role: "admin" | "customer";
-  customer_id: string | null;
-  is_active: number;
-  full_name: string;
-};
 const app = new Hono<{ Bindings: Env; Variables: { profile: Profile } }>();
 const credentials = z.object({
   email: z
@@ -63,31 +59,20 @@ app.get("/api/public/services", async (c) =>
   c.json(
     (
       await c.env.DB.prepare(
-        "SELECT id,name,description,price_cents FROM services WHERE active=1 ORDER BY name LIMIT 100",
+        "SELECT id,name,description,price_cents,duration_minutes,buffer_minutes FROM services WHERE active=1 ORDER BY name LIMIT 100",
       ).all()
     ).results,
   ),
 );
 app.get("/api/public/slots", async (c) => {
-  const date = z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .parse(c.req.query("date"));
-  const taken = (
-    await c.env.DB.prepare(
-      "SELECT slot FROM bookings WHERE date=? AND status!='cancelled'",
-    )
-      .bind(date)
-      .all<{ slot: string }>()
-  ).results;
-  return c.json({
-    timezone: c.env.BUSINESS_TIMEZONE,
-    slots: slots.filter(
-      (s) =>
-        validSlot(date, s, c.env.BUSINESS_TIMEZONE) &&
-        !taken.some((b) => b.slot === s),
+  return c.json(
+    await availability(
+      c.env.DB,
+      c.req.query("date") ?? "",
+      c.env.BUSINESS_TIMEZONE,
+      c.req.query("serviceId"),
     ),
-  });
+  );
 });
 app.post("/api/public/book", async (c) => {
   if (
@@ -106,26 +91,60 @@ app.post("/api/public/book", async (c) => {
   if (!validSlot(input.date, input.slot, c.env.BUSINESS_TIMEZONE))
     return c.json({ error: "Choose a future slot within 90 days" }, 400);
   const service = await c.env.DB.prepare(
-    "SELECT name,price_cents FROM services WHERE id=? AND active=1",
+    "SELECT name,price_cents,duration_minutes,buffer_minutes FROM services WHERE id=? AND active=1",
   )
     .bind(input.serviceId)
-    .first<{ name: string; price_cents: number }>();
+    .first<{
+      name: string;
+      price_cents: number;
+      duration_minutes: number;
+      buffer_minutes: number;
+    }>();
   if (!service) return c.json({ error: "Package unavailable" }, 400);
+  const available = await availability(
+    c.env.DB,
+    input.date,
+    c.env.BUSINESS_TIMEZONE,
+    input.serviceId,
+  );
+  const choice = available.options.find(
+    (o) =>
+      o.slot === input.slot &&
+      (!input.groomerId || o.groomerId === input.groomerId),
+  );
+  if (!choice)
+    return c.json(
+      { error: "That time is unavailable. Choose another slot." },
+      409,
+    );
   const id = crypto.randomUUID();
   try {
-    await c.env.DB.prepare(
-      "INSERT INTO bookings(id,service_id,service_name,price_cents,date,slot,details) VALUES(?,?,?,?,?,?,?)",
-    )
-      .bind(
-        id,
-        input.serviceId,
-        service.name,
-        service.price_cents,
-        input.date,
+    const insert = c.env.DB.prepare(
+      "INSERT INTO bookings(id,service_id,service_name,price_cents,date,slot,details,groomer_id,duration_minutes,buffer_minutes) VALUES(?,?,?,?,?,?,?,?,?,?)",
+    ).bind(
+      id,
+      input.serviceId,
+      service.name,
+      service.price_cents,
+      input.date,
+      input.slot,
+      JSON.stringify(input),
+      choice.groomerId,
+      service.duration_minutes,
+      service.buffer_minutes,
+    );
+    await c.env.DB.batch([
+      insert,
+      ...quarterSlots(
         input.slot,
-        JSON.stringify(input),
-      )
-      .run();
+        service.duration_minutes,
+        service.buffer_minutes,
+      ).map((slot) =>
+        c.env.DB.prepare(
+          "INSERT INTO booking_occupancy(booking_id,date,slot,groomer_id) VALUES(?,?,?,?)",
+        ).bind(id, input.date, slot, choice.groomerId),
+      ),
+    ]);
   } catch (error) {
     if (String(error).includes("UNIQUE"))
       return c.json(
@@ -206,7 +225,7 @@ app.use("/api/*", async (c, next) => {
   });
   if (!session) return c.json({ error: "Please sign in" }, 401);
   const profile = await c.env.DB.prepare(
-    "SELECT * FROM user_profiles WHERE id=? AND is_active=1",
+    "SELECT p.* FROM user_profiles p WHERE p.id=? AND p.is_active=1 AND (p.role='admin' OR EXISTS(SELECT 1 FROM customers c WHERE c.id=p.customer_id AND c.archived_at IS NULL))",
   )
     .bind(session.user.id)
     .first<Profile>();
@@ -220,8 +239,12 @@ app.post("/api/data", async (c) => {
     error: null,
   });
 });
+app.route("/api/workspace", workspace);
 app.use("/api/admin/*", async (c, next) => {
-  if (c.get("profile").role !== "admin")
+  const capability = /\/(bookings|booking-status)$/.test(c.req.path)
+    ? "bookings"
+    : "manage";
+  if (!can(c.get("profile"), capability))
     return c.json({ error: "Admin access required" }, 403);
   await next();
 });
@@ -303,15 +326,24 @@ app.post("/api/admin/create-customer-account", async (c) => {
   return c.json({ success: true }, 201);
 });
 app.post("/api/admin/create-staff", async (c) => {
-  const input = credentials.parse(await c.req.json());
+  const input = credentials
+    .extend({
+      staffRole: z.enum(["owner", "receptionist", "groomer"]).default("owner"),
+    })
+    .parse(await c.req.json());
   const result = await createAuth(c.env).api.createUser({
-    body: { ...input, role: "admin" },
+    body: {
+      email: input.email,
+      password: input.password,
+      name: input.name,
+      role: input.staffRole === "owner" ? "admin" : "user",
+    },
   });
   try {
     await c.env.DB.prepare(
-      "INSERT INTO user_profiles (id,role,full_name) VALUES (?,?,?)",
+      "INSERT INTO user_profiles (id,role,full_name,staff_role) VALUES (?,?,?,?)",
     )
-      .bind(result.user.id, "admin", input.name)
+      .bind(result.user.id, "admin", input.name, input.staffRole)
       .run();
   } catch (error) {
     await c.env.DB.prepare("DELETE FROM user WHERE id=?")
@@ -344,7 +376,7 @@ app.post("/api/admin/toggle-user", async (c) => {
   if (input.userId === c.get("profile").id)
     return c.json({ error: "You cannot disable your own account" }, 400);
   const changed = await c.env.DB.prepare(
-    "UPDATE user_profiles SET is_active=? WHERE id=? AND (?=1 OR role!='admin' OR (SELECT count(*) FROM user_profiles WHERE role='admin' AND is_active=1)>1) RETURNING id",
+    "UPDATE user_profiles SET is_active=? WHERE id=? AND (?=1 OR role!='admin' OR staff_role!='owner' OR (SELECT count(*) FROM user_profiles WHERE role='admin' AND staff_role='owner' AND is_active=1)>1) RETURNING id",
   )
     .bind(Number(input.active), input.userId, Number(input.active))
     .first();

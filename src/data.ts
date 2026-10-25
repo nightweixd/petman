@@ -1,8 +1,18 @@
 import { z } from "zod";
+import type { Profile } from "./permissions";
 
 // Only these business fields may cross the API. Auth tables and raw SQL are never exposed.
 export const columns: Record<string, string[]> = {
-  customers: ["id", "customer_id", "customer_name", "created_at", "updated_at"],
+  customers: [
+    "id",
+    "customer_id",
+    "customer_name",
+    "created_at",
+    "updated_at",
+    "phone",
+    "address",
+    "tags",
+  ],
   pets: [
     "id",
     "customer_id",
@@ -67,12 +77,21 @@ export const columns: Record<string, string[]> = {
   user_profiles: [
     "id",
     "role",
+    "staff_role",
     "customer_id",
     "full_name",
     "is_active",
     "created_at",
   ],
-  services: ["id", "name", "description", "price_cents", "active"],
+  services: [
+    "id",
+    "name",
+    "description",
+    "price_cents",
+    "active",
+    "duration_minutes",
+    "buffer_minutes",
+  ],
 };
 const scalar = z.union([
   z.string().max(20000),
@@ -98,13 +117,9 @@ export const querySchema = z.object({
   rows: z.array(z.record(z.string(), z.unknown())).min(1).max(100).optional(),
   values: z.record(z.string(), z.unknown()).optional(),
   single: z.boolean().default(false),
+  limit: z.number().int().min(1).max(10000).default(10000),
+  offset: z.number().int().min(0).max(10000000).default(0),
 });
-type Profile = {
-  id: string;
-  role: string;
-  customer_id: string | null;
-  is_active: number;
-};
 function value(input: unknown): string | number | null {
   if (input === null) return null;
   if (typeof input === "boolean") return Number(input);
@@ -126,6 +141,44 @@ export async function executeQuery(
   };
   const parameters: (string | number | null)[] = [],
     conditions: string[] = [];
+  if (q.table === "customers") conditions.push("archived_at IS NULL");
+  if (q.table === "pets" || q.table === "members")
+    conditions.push(
+      "customer_id IN (SELECT id FROM customers WHERE archived_at IS NULL)",
+    );
+  if (q.table === "appointments")
+    conditions.push(
+      "pet_id IN (SELECT p.id FROM pets p JOIN customers c ON c.id=p.customer_id WHERE c.archived_at IS NULL)",
+    );
+  if (q.table === "customers" && q.action === "delete")
+    throw new Error("Use customer archive instead");
+  if (q.table === "deleted_customers" && q.action !== "select")
+    throw new Error("Recovery records are retained; use restore");
+  if (profile.role === "admin" && profile.staff_role !== "owner") {
+    if (q.table === "user_profiles") {
+      if (q.action !== "select") throw new Error("Access denied");
+      conditions.push("id = ?");
+      parameters.push(profile.id);
+    } else if (profile.staff_role === "groomer") {
+      if (
+        q.action !== "select" ||
+        !["customers", "pets", "appointments", "services"].includes(q.table)
+      )
+        throw new Error("Access denied");
+    } else if (
+      ![
+        "customers",
+        "pets",
+        "appointments",
+        "members",
+        "membership_tiers",
+        "services",
+      ].includes(q.table)
+    )
+      throw new Error("Access denied");
+    if (q.table === "membership_tiers" && q.action !== "select")
+      throw new Error("Access denied");
+  }
   if (profile.role !== "admin") {
     if (q.action !== "select") throw new Error("Read-only account");
     switch (q.table) {
@@ -177,6 +230,34 @@ export async function executeQuery(
   const normalize = (row: Record<string, unknown>, insert: boolean) => {
     const result: Record<string, unknown> = { ...row };
     if (insert && !result.id) result.id = crypto.randomUUID();
+    if (insert && q.table === "customers" && !result.customer_id)
+      result.customer_id =
+        "CUST-" + crypto.randomUUID().slice(0, 12).toUpperCase();
+    if (q.table === "services") {
+      if ("duration_minutes" in result)
+        result.duration_minutes = z
+          .number()
+          .int()
+          .min(15)
+          .max(480)
+          .refine((v) => v % 15 === 0)
+          .parse(result.duration_minutes);
+      if ("buffer_minutes" in result)
+        result.buffer_minutes = z
+          .number()
+          .int()
+          .min(0)
+          .max(120)
+          .refine((v) => v % 15 === 0)
+          .parse(result.buffer_minutes);
+      if ("price_cents" in result)
+        result.price_cents = z
+          .number()
+          .int()
+          .min(0)
+          .max(100000000)
+          .parse(result.price_cents);
+    }
     if (!insert && ("id" in result || "created_at" in result))
       throw new Error("Cannot change record identity");
     if (fields.includes("updated_at"))
@@ -197,7 +278,7 @@ export async function executeQuery(
       q.table === "appointments" &&
       q.select === "price, date, pets(customer_id)";
     const selected = joined
-      ? "*"
+      ? '*,(SELECT customer_id FROM pets WHERE pets.id=appointments.pet_id) AS __owner'
       : q.select === "*"
         ? "*"
         : q.select
@@ -205,26 +286,18 @@ export async function executeQuery(
             .map((s) => field(s.trim()))
             .join(",");
     const order = q.order
-      ? ` ORDER BY ${field(q.order.column)} ${q.order.ascending ? "ASC" : "DESC"}`
+      ? ` ORDER BY ${field(q.order.column)} ${q.order.ascending ? "ASC" : "DESC"}${q.order.column==='id'?'':',id ASC'}`
       : "";
     const rows = (
       await db
-        .prepare(`SELECT ${selected} FROM ${table}${where}${order} LIMIT 10001`)
-        .bind(...parameters)
+        .prepare(
+          `SELECT ${selected} FROM ${table}${where}${order || " ORDER BY id ASC"} LIMIT ? OFFSET ?`,
+        )
+        .bind(...parameters, q.limit, q.offset)
         .all<Record<string, unknown>>()
     ).results;
-    if (rows.length > 10000)
-      throw new Error("Result too large; narrow the query");
     if (joined) {
-      const owners = (
-        await db
-          .prepare("SELECT id, customer_id FROM pets")
-          .all<{ id: string; customer_id: string }>()
-      ).results;
-      for (const row of rows)
-        row.pets = {
-          customer_id: owners.find((p) => p.id === row.pet_id)?.customer_id,
-        };
+      for (const row of rows){row.pets={customer_id:row.__owner};delete row.__owner;}
     }
     for (const row of rows) {
       if (typeof row.snapshot === "string")
