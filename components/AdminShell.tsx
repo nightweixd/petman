@@ -196,7 +196,7 @@ export default function AdminShell({
             </span>
             <Link
               className="pm-profile"
-              href="/staff"
+              href="/account"
               aria-label="Your account"
             >
               {initials || "A"}

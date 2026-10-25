@@ -3,6 +3,8 @@ import Icon from "@/components/Icon";
 import { useEffect, useState } from "react";
 import { database } from "@/lib/database";
 type Booking = {
+  customer_id: string | null;
+  pet_id: string | null;
   id: string;
   service_name: string;
   price_cents: number;
@@ -359,7 +361,8 @@ export default function Bookings() {
               <label>
                 Membership record
                 <select
-                  value={matches[selected.id] ?? ""}
+                  value={selected.customer_id ?? matches[selected.id] ?? ""}
+                  disabled={!!selected.customer_id}
                   onChange={async (e) => {
                     const customerId = e.target.value;
                     setMatches((m) => ({ ...m, [selected.id]: customerId }));
@@ -387,34 +390,36 @@ export default function Bookings() {
                 </small>
               </label>
             )}
-            {selected.status === "pending" && matches[selected.id] && (
-              <label>
-                Pet record
-                <select
-                  value={petMatches[selected.id] ?? ""}
-                  onChange={(e) =>
-                    setPetMatches((m) => ({
-                      ...m,
-                      [selected.id]: e.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Create a new pet</option>
-                  {matchingPets.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.pet_name}
-                      {p.pet_name.toLowerCase() ===
-                      selected.details.petName.toLowerCase()
-                        ? " · name matches"
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-                <small>
-                  Choose an existing pet to keep its visit history together.
-                </small>
-              </label>
-            )}
+            {selected.status === "pending" &&
+              !selected.pet_id &&
+              matches[selected.id] && (
+                <label>
+                  Pet record
+                  <select
+                    value={petMatches[selected.id] ?? ""}
+                    onChange={(e) =>
+                      setPetMatches((m) => ({
+                        ...m,
+                        [selected.id]: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Create a new pet</option>
+                    {matchingPets.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.pet_name}
+                        {p.pet_name.toLowerCase() ===
+                        selected.details.petName.toLowerCase()
+                          ? " · name matches"
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    Choose an existing pet to keep its visit history together.
+                  </small>
+                </label>
+              )}
             <p className="pm-form-note">
               Confirming captures the customer and pet details in your records.
               No online payment is collected.

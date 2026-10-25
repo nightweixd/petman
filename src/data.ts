@@ -160,11 +160,7 @@ export async function executeQuery(
       conditions.push("id = ?");
       parameters.push(profile.id);
     } else if (profile.staff_role === "groomer") {
-      if (
-        q.action !== "select" ||
-        !["customers", "pets", "appointments", "services"].includes(q.table)
-      )
-        throw new Error("Access denied");
+      throw new Error("Access denied");
     } else if (
       ![
         "customers",
@@ -278,7 +274,7 @@ export async function executeQuery(
       q.table === "appointments" &&
       q.select === "price, date, pets(customer_id)";
     const selected = joined
-      ? '*,(SELECT customer_id FROM pets WHERE pets.id=appointments.pet_id) AS __owner'
+      ? "*,(SELECT customer_id FROM pets WHERE pets.id=appointments.pet_id) AS __owner"
       : q.select === "*"
         ? "*"
         : q.select
@@ -286,7 +282,7 @@ export async function executeQuery(
             .map((s) => field(s.trim()))
             .join(",");
     const order = q.order
-      ? ` ORDER BY ${field(q.order.column)} ${q.order.ascending ? "ASC" : "DESC"}${q.order.column==='id'?'':',id ASC'}`
+      ? ` ORDER BY ${field(q.order.column)} ${q.order.ascending ? "ASC" : "DESC"}${q.order.column === "id" ? "" : ",id ASC"}`
       : "";
     const rows = (
       await db
@@ -297,7 +293,10 @@ export async function executeQuery(
         .all<Record<string, unknown>>()
     ).results;
     if (joined) {
-      for (const row of rows){row.pets={customer_id:row.__owner};delete row.__owner;}
+      for (const row of rows) {
+        row.pets = { customer_id: row.__owner };
+        delete row.__owner;
+      }
     }
     for (const row of rows) {
       if (typeof row.snapshot === "string")

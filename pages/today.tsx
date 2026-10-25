@@ -9,6 +9,7 @@ type Booking = {
   status: string;
   stage: string;
   groomer_name: string;
+  medical_history?: string;
   details: string;
 };
 const stages = ["scheduled", "arrived", "grooming", "ready", "collected"];
@@ -79,6 +80,11 @@ export default function Today() {
                       </div>
                       <h4>{d.petName}</h4>
                       <p>{d.name}</p>
+                      {b.medical_history && (
+                        <p className="ops-alert">
+                          Care alert: {b.medical_history}
+                        </p>
+                      )}
                       <small>
                         {b.groomer_name ?? "Salon"} · {b.status}
                       </small>

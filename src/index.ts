@@ -4,7 +4,13 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { createAuth } from "./auth";
 import { executeQuery } from "./data";
-import { bookingSchema, slots, validSlot, transitionBooking } from "./booking";
+import {
+  slots,
+  validSlot,
+  transitionBooking,
+  requestBooking,
+  BookingError,
+} from "./booking";
 import { exportRecords, importRecords } from "./backup";
 import workspace from "./workspace";
 import { can, type Profile } from "./permissions";
@@ -87,73 +93,10 @@ app.post("/api/public/book", async (c) => {
       { error: "Too many booking requests. Please contact the salon." },
       429,
     );
-  const input = bookingSchema.parse(await c.req.json());
-  if (!validSlot(input.date, input.slot, c.env.BUSINESS_TIMEZONE))
-    return c.json({ error: "Choose a future slot within 90 days" }, 400);
-  const service = await c.env.DB.prepare(
-    "SELECT name,price_cents,duration_minutes,buffer_minutes FROM services WHERE id=? AND active=1",
-  )
-    .bind(input.serviceId)
-    .first<{
-      name: string;
-      price_cents: number;
-      duration_minutes: number;
-      buffer_minutes: number;
-    }>();
-  if (!service) return c.json({ error: "Package unavailable" }, 400);
-  const available = await availability(
-    c.env.DB,
-    input.date,
-    c.env.BUSINESS_TIMEZONE,
-    input.serviceId,
+  return c.json(
+    await requestBooking(c.env.DB, c.env.BUSINESS_TIMEZONE, await c.req.json()),
+    201,
   );
-  const choice = available.options.find(
-    (o) =>
-      o.slot === input.slot &&
-      (!input.groomerId || o.groomerId === input.groomerId),
-  );
-  if (!choice)
-    return c.json(
-      { error: "That time is unavailable. Choose another slot." },
-      409,
-    );
-  const id = crypto.randomUUID();
-  try {
-    const insert = c.env.DB.prepare(
-      "INSERT INTO bookings(id,service_id,service_name,price_cents,date,slot,details,groomer_id,duration_minutes,buffer_minutes) VALUES(?,?,?,?,?,?,?,?,?,?)",
-    ).bind(
-      id,
-      input.serviceId,
-      service.name,
-      service.price_cents,
-      input.date,
-      input.slot,
-      JSON.stringify(input),
-      choice.groomerId,
-      service.duration_minutes,
-      service.buffer_minutes,
-    );
-    await c.env.DB.batch([
-      insert,
-      ...quarterSlots(
-        input.slot,
-        service.duration_minutes,
-        service.buffer_minutes,
-      ).map((slot) =>
-        c.env.DB.prepare(
-          "INSERT INTO booking_occupancy(booking_id,date,slot,groomer_id) VALUES(?,?,?,?)",
-        ).bind(id, input.date, slot, choice.groomerId),
-      ),
-    ]);
-  } catch (error) {
-    if (String(error).includes("UNIQUE"))
-      return c.json(
-        { error: "That slot was just booked. Please choose another." },
-        409,
-      );
-    throw error;
-  }
-  return c.json({ id, status: "pending" }, 201);
 });
 app.post("/api/setup", async (c) => {
   if (
@@ -240,9 +183,84 @@ app.post("/api/data", async (c) => {
   });
 });
 app.route("/api/workspace", workspace);
+app.use("/api/customer/*", async (c, next) => {
+  const profile = c.get("profile");
+  if (profile.role !== "customer" || !profile.customer_id)
+    return c.json(
+      {
+        error:
+          "A linked customer account is required. Please contact the salon.",
+      },
+      403,
+    );
+  await next();
+});
+app.get("/api/customer/home", async (c) => {
+  const id = c.get("profile").customer_id!;
+  const [customer, pets, visits, member, tiers, bookings, totals] =
+    await Promise.all([
+      c.env.DB.prepare("SELECT customer_name FROM customers WHERE id=?")
+        .bind(id)
+        .first(),
+      c.env.DB.prepare(
+        "SELECT id,pet_name,pet_type,breed,birthday,contact FROM pets WHERE customer_id=? ORDER BY pet_name",
+      )
+        .bind(id)
+        .all(),
+      c.env.DB.prepare(
+        "SELECT a.id,a.pet_id,p.pet_name,a.date,a.type,a.groomer,a.price FROM appointments a JOIN pets p ON p.id=a.pet_id WHERE p.customer_id=? ORDER BY a.date DESC LIMIT 1000",
+      )
+        .bind(id)
+        .all(),
+      c.env.DB.prepare(
+        "SELECT email,date_of_birth,marketing_consent FROM members WHERE customer_id=?",
+      )
+        .bind(id)
+        .first(),
+      c.env.DB.prepare(
+        "SELECT id,name,min_spend,discount_pct,perks FROM membership_tiers ORDER BY min_spend",
+      ).all(),
+      c.env.DB.prepare(
+        "SELECT id,service_name,price_cents,date,slot,status,json_extract(details,'$.petName') AS pet_name FROM bookings WHERE customer_id=? ORDER BY date DESC,slot DESC LIMIT 100",
+      )
+        .bind(id)
+        .all(),
+      c.env.DB.prepare(
+        "SELECT COALESCE(SUM(a.price),0) AS spend,COUNT(*) AS visits FROM appointments a JOIN pets p ON p.id=a.pet_id WHERE p.customer_id=?",
+      )
+        .bind(id)
+        .first(),
+    ]);
+  return c.json({
+    customer,
+    pets: pets.results,
+    visits: visits.results,
+    member,
+    tiers: tiers.results,
+    bookings: bookings.results,
+    totals,
+  });
+});
+app.post("/api/customer/book", async (c) => {
+  const profile = c.get("profile");
+  if (!(await consume(c.env.DB, "customer-book:" + profile.id, 10, 3600)))
+    return c.json(
+      { error: "Too many booking requests. Please contact the salon." },
+      429,
+    );
+  return c.json(
+    await requestBooking(
+      c.env.DB,
+      c.env.BUSINESS_TIMEZONE,
+      await c.req.json(),
+      profile.customer_id,
+    ),
+    201,
+  );
+});
 app.use("/api/admin/*", async (c, next) => {
   const capability = /\/(bookings|booking-status)$/.test(c.req.path)
-    ? "bookings"
+    ? "records"
     : "manage";
   if (!can(c.get("profile"), capability))
     return c.json({ error: "Admin access required" }, 403);
@@ -398,6 +416,8 @@ app.notFound((c) =>
     : c.env.ASSETS.fetch(c.req.raw),
 );
 app.onError((error, c) => {
+  if (error instanceof BookingError)
+    return c.json({ error: error.message }, error.status);
   if (error instanceof z.ZodError)
     return c.json(
       {

@@ -285,7 +285,7 @@ api.get("/today", async (c) => {
   return c.json(
     (
       await c.env.DB.prepare(
-        "SELECT b.*,g.name groomer_name,c.customer_name FROM bookings b LEFT JOIN groomers g ON g.id=b.groomer_id LEFT JOIN customers c ON c.id=b.customer_id WHERE b.date=? AND b.status!='cancelled' ORDER BY b.slot",
+        "SELECT b.id,b.slot,b.date,b.status,b.stage,b.duration_minutes,json_object('name',json_extract(b.details,'$.name'),'petName',json_extract(b.details,'$.petName'),'phone',json_extract(b.details,'$.phone')) details,g.name groomer_name,p.medical_history FROM bookings b LEFT JOIN groomers g ON g.id=b.groomer_id LEFT JOIN pets p ON p.id=b.pet_id WHERE b.date=? AND b.status!='cancelled' ORDER BY b.slot",
       )
         .bind(date)
         .all()

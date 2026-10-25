@@ -2,8 +2,26 @@
   display: grid;
   gap: 24px;
 }
+.pm-rail nav {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+  scrollbar-width: thin;
+}
+.pm-rail-bottom {
+  flex-shrink: 0;
+}
 .ops-pad {
   padding: 24px;
+}
+.pm-drawer > .ops-form,
+.pm-drawer > .ops-section,
+.pm-drawer > .ops-invoice,
+.pm-drawer > .ops-actions {
+  margin-inline: 24px;
+}
+.ops-invoice .ops-grid {
+  margin-bottom: 24px;
 }
 .ops-actions {
   display: flex;
@@ -279,6 +297,12 @@
   }
 }
 @media print {
+  .pm-rail,
+  .pm-topbar,
+  .pm-footer,
+  .ops-workspace > section {
+    display: none !important;
+  }
   body * {
     visibility: hidden;
   }
@@ -292,6 +316,7 @@
     width: 100%;
     padding: 15mm;
     background: white;
+    margin: 0;
   }
   .pm-drawer-overlay,
   .pm-drawer {

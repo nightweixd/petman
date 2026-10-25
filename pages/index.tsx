@@ -211,6 +211,9 @@ function LoginScreen() {
         <a href="/book">
           Looking to book an appointment? <Icon name="arrow" size={14} />
         </a>
+        <a href="/login">
+          Customer account sign in <Icon name="arrow" size={14} />
+        </a>
       </section>
     </main>
   );
@@ -2146,9 +2149,7 @@ export default function PetMan({
 
   // ── Customer portal — read-only view of their own data ───────────────────────
   if (userRole === "customer") {
-    return (
-      <CustomerPortal userId={session.user.id} onSignOut={() => signOut()} />
-    );
+    return <CustomerPortal session={session} />;
   }
 
   const handleAdd = (nc: Customer) => {

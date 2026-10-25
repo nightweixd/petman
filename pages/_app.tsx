@@ -2,6 +2,7 @@ import "@/pages/globals.css";
 import "@fontsource-variable/manrope";
 import "@/styles/admin.css";
 import "@/styles/operations.css";
+import "@/styles/customer.css";
 import AdminShell, { AdminNavigation } from "@/components/AdminShell";
 import { useRouter } from "next/router";
 import type { AppProps } from "next/app";
@@ -64,7 +65,9 @@ export default function App({ Component, pageProps }: AppProps) {
     window.addEventListener("petman-error", show);
     return () => window.removeEventListener("petman-error", show);
   }, []);
-  const publicPage = ["/", "/book", "/setup"].includes(router.pathname);
+  const publicPage = ["/", "/book", "/setup", "/login", "/portal"].includes(
+    router.pathname,
+  );
   if (!publicPage && (loading || (session && !role)))
     return <p className="ops-empty">Checking your session…</p>;
   if (!publicPage && !session)
@@ -78,7 +81,7 @@ export default function App({ Component, pageProps }: AppProps) {
     session &&
     role === "admin" &&
     staffRole === "groomer" &&
-    !["/today", "/staff"].includes(router.pathname)
+    !["/today", "/account"].includes(router.pathname)
   )
     return (
       <main className="ops-pad">
@@ -113,12 +116,22 @@ export default function App({ Component, pageProps }: AppProps) {
       <AdminNavigation.Provider value={{ view, setView }}>
         {session &&
         role === "admin" &&
-        !["/book", "/setup"].includes(router.pathname) ? (
+        !["/book", "/setup", "/login", "/portal"].includes(router.pathname) ? (
           <AdminShell session={session} staffRole={staffRole}>
-            <Component {...pageProps} session={session} loading={loading} />
+            <Component
+              {...pageProps}
+              session={session}
+              loading={loading}
+              accountRole={role}
+            />
           </AdminShell>
         ) : (
-          <Component {...pageProps} session={session} loading={loading} />
+          <Component
+            {...pageProps}
+            session={session}
+            loading={loading}
+            accountRole={role}
+          />
         )}
       </AdminNavigation.Provider>
     </>

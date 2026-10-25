@@ -91,7 +91,7 @@ export async function availability(
       n + service.duration_minutes + service.buffer_minutes <= end;
       n += 15
     ) {
-      if (days === 0 && n < notice) continue;
+      if (days * 1440 + n < notice) continue;
       if (
         g.break_start &&
         g.break_end &&

@@ -505,7 +505,7 @@ export default function CustomerWorkspace({
   );
 }
 function Activity({ customers }: { customers: Customer[] }) {
-  const [metric, setMetric] = useState("Revenue"),
+  const [metric, setMetric] = useState("Visit value"),
     [months, setMonths] = useState(6);
   const visits = customers.flatMap((c) =>
     c.pets.flatMap((p) => p.appointments),
@@ -519,7 +519,7 @@ function Activity({ customers }: { customers: Customer[] }) {
     return {
       label: d.toLocaleDateString("en-MY", { month: "short" }),
       value:
-        metric === "Revenue"
+        metric === "Visit value"
           ? list.reduce((n, v) => n + (v.price ?? 0), 0)
           : list.length,
     };
@@ -546,7 +546,7 @@ function Activity({ customers }: { customers: Customer[] }) {
         </select>
       </div>
       <div className="pm-segmented">
-        {["Revenue", "Visits"].map((m) => (
+        {["Visit value", "Visits"].map((m) => (
           <button
             key={m}
             className={metric === m ? "is-active" : ""}
@@ -558,10 +558,10 @@ function Activity({ customers }: { customers: Customer[] }) {
         ))}
       </div>
       <strong className="pm-insight-value">
-        {metric === "Revenue" ? money(total) : number.format(total)}
+        {metric === "Visit value" ? money(total) : number.format(total)}
       </strong>
       <p>
-        {metric === "Revenue"
+        {metric === "Visit value"
           ? "Recorded appointment amounts"
           : "Recorded appointments"}{" "}
         in the last {months} months.
