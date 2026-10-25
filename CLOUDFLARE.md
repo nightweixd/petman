@@ -7,8 +7,8 @@ The screens come from `nightweixd/pet` at commit `99a2686` (source supplied on 2
 - Next.js exports the UI to `out/`. Cloudflare Workers serves those assets and the API on the same origin.
 - D1 stores customers, pets, appointments, memberships, booking requests, services, users, password hashes, sessions and audit records.
 - Better Auth handles passwords, signed cookies, eight-hour sessions and authentication rate limits. There is no Supabase connection or payment integration.
-- Admins have full business access. Customer logins are linked explicitly by an admin and can only read their own records. Missing or disabled profiles are denied by the backend.
-- `/book`: public request form. `/bookings`: admin queue and packages. `/staff`: user management and password change. `/setup`: first admin setup, protected by a private token and available once.
+- Admins have full business access. Customer logins are linked explicitly by an admin, can read their own records, and can submit booking requests linked to their account. Missing or disabled profiles are denied by the backend.
+- `/login`: customer sign-in. `/portal`: customer pets, membership, visits and booking status. `/book`: four-step request form for guests or signed-in customers. `/bookings`: admin queue and packages. `/staff`: user management and password change. `/setup`: first admin setup, protected by a private token and available once.
 
 ## Local setup
 
@@ -58,6 +58,7 @@ If a new Worker must exist before secrets can be set, deploy the bundle first, t
 - One salon resource, one-hour slots starting 09:00 through 16:00, every day, within 90 days. Change `src/booking.ts` for a different schedule; multiple groomers, closed days and variable durations need additional scheduling logic.
 - Submissions are **pending requests**. Staff contact customers and confirm or cancel them. Pending requests occupy their selected slot until staff act. No automatic expiry or notifications are included. Slots are reserved only when the details form is submitted.
 - A database unique index prevents simultaneous requests taking the same slot.
+- Signed-in customers can select a saved pet or provide a new pet's details. The server derives customer identity from the session and verifies saved-pet ownership. Requests appear in their portal immediately; confirmation reuses an existing selected pet. Customer and membership profile edits remain staff-managed. The portal shows up to 100 booking requests and 1,000 recent visits; membership spending and visit totals include all recorded visits.
 - On confirmation, staff select an existing customer after verifying identity or create a new one. A new pet is captured. A guest submission cannot overwrite existing identity or membership fields. Staff should review duplicate pet records for returning customers; existing-pet matching is not included.
 - Customer birthday, pet birthday and optional marketing consent with its capture timestamp are stored. Existing memberships keep their consent when linking a guest request. Staff can change consent through Members. Marketing delivery and consent withdrawal screens are not automated.
 - Completing a booking records one appointment at the quoted amount. Membership spending/tier views derive from appointment amounts. The app does not verify payments or apply discounts automatically; staff adjust the visit amount to the actual charge. Configure example tier rules before use.
@@ -77,7 +78,7 @@ A full export contains sensitive customer and authentication data. The in-app im
 
 ## PR previews
 
-Workers Builds uses `npm run build` followed by `npx wrangler preview` for PR #2.
+Workers Builds uses `npm run build` followed by `npx wrangler preview` for previews.
 The `previews` block in `wrangler.jsonc` binds the separate `petman-preview` D1
 database. Preview data is shared between previews using this configuration, so
 use fictional records only. Production bindings and secrets are not inherited.
@@ -91,7 +92,7 @@ npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-m
 
 The preview schema is initialized through migration 0003. Apply future migrations
 with the command above; keep its database ID and `previews.d1_databases` in sync.
-`previews.vars.APP_ORIGIN` currently matches the PR #2 branch URL. For another
+`previews.vars.APP_ORIGIN` currently matches the `codex/customer-portal-booking` branch URL. For another
 branch, override it to that preview's exact HTTPS origin when deploying:
 
 ```powershell

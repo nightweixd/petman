@@ -36,6 +36,88 @@ export const bookingSchema = z.object({
   petType: z.enum(["Dog", "Cat", "Other"]),
   consent: z.boolean(),
 });
+export class BookingError extends Error {
+  constructor(
+    message: string,
+    public status: 400 | 403 | 409,
+  ) {
+    super(message);
+  }
+}
+
+// A signed-in request uses the server-verified customer and pet, never submitted IDs.
+export async function requestBooking(
+  db: D1Database,
+  timezone: string,
+  raw: unknown,
+  customerId: string | null = null,
+) {
+  let petId: string | null = null;
+  let input = bookingSchema.parse(raw);
+  if (customerId) {
+    const selected = z
+      .object({ petId: z.string().uuid().optional() })
+      .parse(raw);
+    if (selected.petId) {
+      const pet = await db
+        .prepare(
+          "SELECT pet_name,pet_type,birthday FROM pets WHERE id=? AND customer_id=?",
+        )
+        .bind(selected.petId, customerId)
+        .first<{
+          pet_name: string;
+          pet_type: string;
+          birthday: string | null;
+        }>();
+      if (!pet)
+        throw new BookingError("Choose a pet from your own account.", 403);
+      petId = selected.petId;
+      input = {
+        ...input,
+        petName: pet.pet_name,
+        petType: ["Dog", "Cat"].includes(pet.pet_type)
+          ? (pet.pet_type as "Dog" | "Cat")
+          : "Other",
+        petBirthday: pet.birthday ?? undefined,
+      };
+    }
+  }
+  if (!validSlot(input.date, input.slot, timezone))
+    throw new BookingError("Choose a future slot within 90 days.", 400);
+  const service = await db
+    .prepare("SELECT name,price_cents FROM services WHERE id=? AND active=1")
+    .bind(input.serviceId)
+    .first<{ name: string; price_cents: number }>();
+  if (!service)
+    throw new BookingError("Package unavailable. Please choose another.", 400);
+  const id = crypto.randomUUID();
+  try {
+    await db
+      .prepare(
+        "INSERT INTO bookings(id,service_id,service_name,price_cents,date,slot,details,customer_id,pet_id) VALUES(?,?,?,?,?,?,?,?,?)",
+      )
+      .bind(
+        id,
+        input.serviceId,
+        service.name,
+        service.price_cents,
+        input.date,
+        input.slot,
+        JSON.stringify(input),
+        customerId,
+        petId,
+      )
+      .run();
+  } catch (error) {
+    if (String(error).includes("UNIQUE"))
+      throw new BookingError(
+        "That slot was just booked. Please choose another.",
+        409,
+      );
+    throw error;
+  }
+  return { id, status: "pending" };
+}
 export function validSlot(day: string, slot: string, timezone: string) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-CA", {
@@ -82,23 +164,30 @@ export async function transitionBooking(
       slot: string;
       price_cents: number;
       service_name: string;
-      pet_id: string;
+      pet_id: string | null;
+      customer_id: string | null;
     }>();
   if (!booking) throw new Error("Booking not found");
   const details = bookingSchema.parse(JSON.parse(booking.details));
   const statements: D1PreparedStatement[] = [];
   if (status === "confirmed" && booking.status === "pending") {
-    const customer = customerId ?? crypto.randomUUID(),
-      pet = crypto.randomUUID();
+    if (booking.customer_id && customerId && customerId !== booking.customer_id)
+      throw new BookingError(
+        "This request is already linked to a customer.",
+        409,
+      );
+    const linkedCustomer = booking.customer_id ?? customerId;
+    const customer = linkedCustomer ?? crypto.randomUUID(),
+      pet = booking.pet_id ?? crypto.randomUUID();
     if (
-      customerId &&
+      linkedCustomer &&
       !(await db
         .prepare("SELECT id FROM customers WHERE id=?")
         .bind(customer)
         .first())
     )
       throw new Error("Customer not found");
-    if (!customerId)
+    if (!linkedCustomer)
       statements.push(
         db
           .prepare(
@@ -106,20 +195,21 @@ export async function transitionBooking(
           )
           .bind(customer, "WEB-" + customer.slice(0, 8), details.name),
       );
-    statements.push(
-      db
-        .prepare(
-          "INSERT INTO pets(id,customer_id,pet_name,pet_type,contact,birthday) VALUES(?,?,?,?,?,?)",
-        )
-        .bind(
-          pet,
-          customer,
-          details.petName,
-          details.petType,
-          details.phone,
-          details.petBirthday ?? null,
-        ),
-    );
+    if (!booking.pet_id)
+      statements.push(
+        db
+          .prepare(
+            "INSERT INTO pets(id,customer_id,pet_name,pet_type,contact,birthday) VALUES(?,?,?,?,?,?)",
+          )
+          .bind(
+            pet,
+            customer,
+            details.petName,
+            details.petType,
+            details.phone,
+            details.petBirthday ?? null,
+          ),
+      );
     // A guest submission must never overwrite existing identity or membership details.
     statements.push(
       db

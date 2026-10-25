@@ -3,6 +3,8 @@ import Icon from "@/components/Icon";
 import { useEffect, useState } from "react";
 import { database } from "@/lib/database";
 type Booking = {
+  customer_id: string | null;
+  pet_id: string | null;
   id: string;
   service_name: string;
   price_cents: number;
@@ -354,7 +356,8 @@ export default function Bookings() {
               <label>
                 Membership record
                 <select
-                  value={matches[selected.id] ?? ""}
+                  value={selected.customer_id ?? matches[selected.id] ?? ""}
+                  disabled={!!selected.customer_id}
                   onChange={(e) =>
                     setMatches((m) => ({ ...m, [selected.id]: e.target.value }))
                   }
@@ -367,8 +370,12 @@ export default function Bookings() {
                   ))}
                 </select>
                 <small>
-                  Verify identity before linking an existing customer. A new pet
-                  record will be added.
+                  {selected.customer_id
+                    ? "Linked to the signed-in customer's record. "
+                    : "Verify identity before linking an existing customer. "}
+                  {selected.pet_id
+                    ? "The existing pet record will be used."
+                    : "A new pet record will be added."}
                 </small>
               </label>
             )}
@@ -430,13 +437,11 @@ export default function Bookings() {
               const form = e.currentTarget,
                 f = new FormData(form);
               setBusy(true);
-              const r = await database
-                .from("services")
-                .insert({
-                  name: String(f.get("name")),
-                  description: String(f.get("description")),
-                  price_cents: Math.round(Number(f.get("price")) * 100),
-                });
+              const r = await database.from("services").insert({
+                name: String(f.get("name")),
+                description: String(f.get("description")),
+                price_cents: Math.round(Number(f.get("price")) * 100),
+              });
               if (r.error) setError(r.error.message);
               else {
                 form.reset();

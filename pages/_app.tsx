@@ -1,6 +1,7 @@
 import "@/pages/globals.css";
 import "@fontsource-variable/manrope";
 import "@/styles/admin.css";
+import "@/styles/customer.css";
 import AdminShell, { AdminNavigation } from "@/components/AdminShell";
 import { useRouter } from "next/router";
 import type { AppProps } from "next/app";
@@ -75,7 +76,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <AdminNavigation.Provider value={{ view, setView }}>
         {session &&
         role === "admin" &&
-        !["/book", "/setup"].includes(router.pathname) ? (
+        !["/book", "/setup", "/login", "/portal"].includes(router.pathname) ? (
           <AdminShell session={session}>
             <Component {...pageProps} session={session} loading={loading} />
           </AdminShell>

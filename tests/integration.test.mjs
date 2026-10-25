@@ -11,7 +11,8 @@ const vars = Object.fromEntries(
     .split(/\r?\n/)
     .map((line) => line.split("=")),
 );
-const fixturePath = ".wrangler/test-credentials.json";
+const fixturePath =
+  process.env.TEST_FIXTURE_PATH ?? ".wrangler/test-credentials.json";
 const initial = !existsSync(fixturePath);
 const credentials = initial
   ? {
@@ -359,6 +360,194 @@ test("D1 accounts, membership records, isolation, revocation and API boundaries"
   });
   assert.equal(visits.data.data.length, 1);
   assert.equal(visits.data.data[0].price, 50);
+  // A customer can book a saved pet and see only bookings linked to their account.
+  const portalEmail = `portal-${randomUUID()}@example.test`;
+  const portalPassword = randomBytes(24).toString("hex");
+  assert.equal(
+    (
+      await call(
+        "/api/admin/create-customer-account",
+        {
+          email: portalEmail,
+          password: portalPassword,
+          customerId: saved.customer_id,
+        },
+        admin,
+      )
+    ).r.status,
+    201,
+  );
+  const portalLogin = await call("/api/auth/sign-in/email", {
+    email: portalEmail,
+    password: portalPassword,
+  });
+  assert.equal(portalLogin.r.status, 200);
+  const portalCookie = portalLogin.cookie;
+  assert.equal((await call("/api/customer/home")).r.status, 401);
+  assert.equal(
+    (await call("/api/customer/home", undefined, admin)).r.status,
+    403,
+  );
+  const home = await call("/api/customer/home", undefined, portalCookie);
+  assert.equal(home.r.status, 200);
+  assert.equal(home.data.pets.length, 1);
+  assert.equal(home.data.pets[0].id, saved.pet_id);
+  assert.deepEqual(
+    home.data.bookings.map((b) => b.id),
+    [booking],
+  );
+  assert.equal(home.data.totals.spend, 50);
+  const nextDate = new Date(Date.now() + 50 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const nextSlots = await call("/api/public/slots?date=" + nextDate);
+  const memberInput = {
+    ...bookingInput,
+    date: nextDate,
+    slot: nextSlots.data.slots[0],
+    petId: saved.pet_id,
+    petName: "FORGED pet name",
+    customerId: randomUUID(),
+    price_cents: 1,
+  };
+  const foreignCustomer = randomUUID(),
+    foreignPet = randomUUID();
+  await q("customers", "insert", {
+    rows: [{ id: foreignCustomer, customer_name: "TEST Other portal owner" }],
+  });
+  await q("pets", "insert", {
+    rows: [
+      {
+        id: foreignPet,
+        customer_id: foreignCustomer,
+        pet_name: "TEST Other portal pet",
+      },
+    ],
+  });
+  assert.equal(
+    (
+      await call(
+        "/api/customer/book",
+        { ...memberInput, petId: foreignPet },
+        portalCookie,
+      )
+    ).r.status,
+    403,
+  );
+  const foreignEmail = `other-portal-${randomUUID()}@example.test`;
+  assert.equal(
+    (
+      await call(
+        "/api/admin/create-customer-account",
+        {
+          email: foreignEmail,
+          password: portalPassword,
+          customerId: foreignCustomer,
+        },
+        admin,
+      )
+    ).r.status,
+    201,
+  );
+  const foreignLogin = await call("/api/auth/sign-in/email", {
+    email: foreignEmail,
+    password: portalPassword,
+  });
+  assert.equal(foreignLogin.r.status, 200);
+  const foreignHome = await call(
+    "/api/customer/home?customerId=" + saved.customer_id,
+    undefined,
+    foreignLogin.cookie,
+  );
+  assert.deepEqual(foreignHome.data.bookings, []);
+  assert.deepEqual(
+    foreignHome.data.pets.map((p) => p.id),
+    [foreignPet],
+  );
+  assert.deepEqual(foreignHome.data.visits, []);
+  assert.equal((await call("/api/customer/book", memberInput)).r.status, 401);
+  assert.equal(
+    (
+      await call(
+        "/api/customer/book",
+        { ...memberInput, petId: randomUUID() },
+        portalCookie,
+      )
+    ).r.status,
+    403,
+  );
+  const requested = await call("/api/customer/book", memberInput, portalCookie);
+  assert.equal(requested.r.status, 201, JSON.stringify(requested.data));
+  const duplicate = await call("/api/customer/book", memberInput, portalCookie);
+  assert.equal(duplicate.r.status, 409);
+  const linkedHome = await call("/api/customer/home", undefined, portalCookie);
+  const linked = linkedHome.data.bookings.find(
+    (b) => b.id === requested.data.id,
+  );
+  assert.equal(linked.status, "pending");
+  assert.equal(linked.pet_name, "TEST Booking Pet");
+  assert.equal(linked.price_cents, 5000);
+  assert.equal(
+    (
+      await call(
+        "/api/admin/booking-status",
+        { id: linked.id, status: "confirmed", customerId: randomUUID() },
+        admin,
+      )
+    ).r.status,
+    409,
+  );
+  assert.equal(
+    (
+      await call(
+        "/api/admin/booking-status",
+        { id: linked.id, status: "confirmed" },
+        admin,
+      )
+    ).r.status,
+    200,
+  );
+  const confirmedHome = await call(
+    "/api/customer/home",
+    undefined,
+    portalCookie,
+  );
+  assert.equal(
+    confirmedHome.data.pets.length,
+    1,
+    "Confirmation must not duplicate the saved pet",
+  );
+  assert.equal(
+    confirmedHome.data.bookings.find((b) => b.id === linked.id).status,
+    "confirmed",
+  );
+  assert.equal(
+    (
+      await call(
+        "/api/admin/booking-status",
+        { id: linked.id, status: "completed" },
+        admin,
+      )
+    ).r.status,
+    200,
+  );
+  const completedHome = await call(
+    "/api/customer/home",
+    undefined,
+    portalCookie,
+  );
+  assert.equal(completedHome.data.totals.visits, 2);
+  assert.equal(completedHome.data.totals.spend, 100);
+  assert.equal(completedHome.data.pets.length, 1);
+  assert.equal(
+    completedHome.data.bookings.find((b) => b.id === linked.id).status,
+    "completed",
+  );
+  const otherPortal = await call("/api/customer/home", undefined, relog.cookie);
+  assert.ok(
+    [401, 403].includes(otherPortal.r.status),
+    "Revoked sessions cannot access the new portal",
+  );
   const backup = await call("/api/admin/backup", undefined, admin);
   assert.ok(backup.data.data.members);
   assert.equal(backup.data.data.user, undefined);
