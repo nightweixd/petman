@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { useState, useEffect, useCallback } from "react";
 import { database } from "@/lib/database";
 
@@ -82,28 +83,38 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
-      <div
-        className="h-1"
-        style={{
-          background: accent ?? "linear-gradient(90deg,#14b8a6,#0d9488)",
-        }}
-      />
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-widest text-stone-400 mb-1">
-              {label}
-            </p>
-            <p className="text-2xl font-black text-stone-800">{value}</p>
-            {sub && <p className="text-xs text-stone-400 mt-1">{sub}</p>}
-          </div>
-          <div className="w-10 h-10 rounded-2xl bg-stone-50 flex items-center justify-center text-xl flex-shrink-0">
-            {icon}
-          </div>
-        </div>
+    <section className="pm-stat">
+      <div className="pm-stat-label">
+        <span
+          className={
+            "pm-stat-icon " +
+            (label === "Customers"
+              ? "orange"
+              : label === "Pets"
+                ? "green"
+                : "blue")
+          }
+        >
+          <Icon
+            name={
+              label === "Customers"
+                ? "users"
+                : label === "Pets"
+                  ? "paw"
+                  : label.includes("revenue")
+                    ? "chart"
+                    : "calendar"
+            }
+            size={18}
+          />
+        </span>
+        {label}
       </div>
-    </div>
+      <div className="pm-stat-bottom">
+        <strong>{value}</strong>
+        <span>{sub}</span>
+      </div>
+    </section>
   );
 }
 
@@ -118,16 +129,10 @@ function SectionHead({
   count?: number;
 }) {
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <span className="text-base">{icon}</span>
-      <p className="text-[11px] font-black uppercase tracking-widest text-teal-500">
-        {title}
-      </p>
-      {count !== undefined && (
-        <span className="ml-auto text-[11px] font-black px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
-          {count}
-        </span>
-      )}
+    <div className="pm-legacy-section-heading">
+      <Icon name="chart" size={16} />
+      <h2>{title}</h2>
+      {count !== undefined && <span>{count}</span>}
     </div>
   );
 }
@@ -387,7 +392,7 @@ export default function DashboardPage({
 
   return (
     <div
-      className="min-h-screen"
+      className="pm-overview min-h-screen"
       style={{ background: "linear-gradient(160deg,#f8faf9,#eef4f2)" }}
     >
       {/* Header */}
@@ -464,7 +469,7 @@ export default function DashboardPage({
                   <div key={t.name}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-bold text-stone-700">
-                        {t.icon} {t.name}
+                        {t.name}
                       </span>
                       <span className="text-sm font-black text-stone-800">
                         {t.count}{" "}
@@ -520,7 +525,7 @@ export default function DashboardPage({
                         {c.name}
                       </p>
                       <p className="text-xs text-stone-400">
-                        {c.visits} visits · {c.tierIcon} {c.tier ?? "No tier"}
+                        {c.visits} visits · {c.tier ?? "No tier"}
                       </p>
                     </div>
                     <p className="text-sm font-black text-teal-600 whitespace-nowrap">

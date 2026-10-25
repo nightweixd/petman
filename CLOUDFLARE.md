@@ -75,7 +75,32 @@ npx wrangler d1 export DB --remote --output petman-full-backup.sql
 
 A full export contains sensitive customer and authentication data. The in-app import supports 2,000 records total and a 1 MB request. Large imports need D1 tooling. Existing screens load at most 10,000 records per query, and the booking queue shows 1,000; add pagination before exceeding these bounds.
 
-## Verification
+## PR previews
+
+Workers Builds uses `npm run build` followed by `npx wrangler preview` for PR #2.
+The `previews` block in `wrangler.jsonc` binds the separate `petman-preview` D1
+database. Preview data is shared between previews using this configuration, so
+use fictional records only. Production bindings and secrets are not inherited.
+An independent `BETTER_AUTH_SECRET` is stored in Cloudflare's Preview base config.
+First-admin setup is disabled until an operator sets a preview-only `SETUP_TOKEN`:
+
+```powershell
+npx wrangler preview base-config secret put SETUP_TOKEN
+npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.jsonc
+```
+
+The preview schema is initialized through migration 0003. Apply future migrations
+with the command above; keep its database ID and `previews.d1_databases` in sync.
+`previews.vars.APP_ORIGIN` currently matches the PR #2 branch URL. For another
+branch, override it to that preview's exact HTTPS origin when deploying:
+
+```powershell
+npx wrangler preview --var APP_ORIGIN:https://<preview-hostname>
+```
+
+Never use the production database or production secrets in a public preview.
+
+## Verification commands
 
 ```powershell
 npm run typecheck

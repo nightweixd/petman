@@ -1,3 +1,5 @@
+import Icon from "@/components/Icon";
+import { useModalFocus } from "@/components/Drawer";
 import { useState, useEffect, useCallback } from "react";
 import { database } from "@/lib/database";
 
@@ -44,6 +46,7 @@ function CreateAccountModal({
   onCreated: () => void;
   session: any;
 }) {
+  const panelRef = useModalFocus(onClose);
   const [customerId, setCustomerId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -108,6 +111,11 @@ function CreateAccountModal({
 
   return (
     <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Create customer login"
+      data-admin-panel="true"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(15,15,15,0.5)", backdropFilter: "blur(4px)" }}
     >
@@ -115,6 +123,14 @@ function CreateAccountModal({
         className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md"
         style={{ animation: "popIn .18s ease-out" }}
       >
+        <button
+          type="button"
+          className="pm-icon-button pm-panel-close"
+          onClick={onClose}
+          aria-label="Close panel"
+        >
+          <Icon name="close" size={16} />
+        </button>
         {/* Header */}
         <div className="px-7 pt-6 pb-4 border-b border-stone-100">
           <div className="flex items-center gap-3">
@@ -261,6 +277,7 @@ function ResetPasswordModal({
   onClose: () => void;
   session: any;
 }) {
+  const panelRef = useModalFocus(onClose);
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -293,6 +310,11 @@ function ResetPasswordModal({
 
   return (
     <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Reset customer password"
+      data-admin-panel="true"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(15,15,15,0.5)", backdropFilter: "blur(4px)" }}
     >
@@ -300,6 +322,14 @@ function ResetPasswordModal({
         className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm"
         style={{ animation: "popIn .18s ease-out" }}
       >
+        <button
+          type="button"
+          className="pm-icon-button pm-panel-close"
+          onClick={onClose}
+          aria-label="Close panel"
+        >
+          <Icon name="close" size={16} />
+        </button>
         <div className="px-7 pt-6 pb-4 border-b border-stone-100">
           <h2 className="text-lg font-black text-stone-800">Reset Password</h2>
           <p className="text-xs text-stone-400">
@@ -451,159 +481,103 @@ export default function AccountsPage({
   const withoutAccount = customers.filter((c) => !c.hasAccount).length;
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "linear-gradient(160deg,#f8faf9,#eef4f2)" }}
-    >
-      {/* Header */}
-      <div className="bg-white border-b border-stone-100 shadow-sm sticky top-0 z-20">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onBack}
-                className="w-9 h-9 rounded-xl border border-stone-200 flex items-center justify-center text-stone-500 hover:bg-stone-50 hover:text-teal-600 transition-all text-sm font-bold"
-              >
-                ←
-              </button>
-              <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center text-xl shadow-lg shadow-teal-200">
-                🔑
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-stone-800 tracking-tight">
-                  Customer Accounts
-                </h1>
-                <p className="text-xs text-stone-400">
-                  <span className="font-bold text-teal-600">{withAccount}</span>{" "}
-                  with login ·{" "}
-                  <span className="font-bold text-amber-500">
-                    {withoutAccount}
-                  </span>{" "}
-                  without
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-teal-500 text-white font-black text-sm hover:bg-teal-600 active:scale-95 transition-all shadow-lg shadow-teal-200 whitespace-nowrap"
-            >
-              + Create Login
-            </button>
-          </div>
-
-          <div className="mt-3 relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">
-              🔍
-            </span>
-            <input
-              type="text"
-              placeholder="Search by name or ID…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-stone-200 text-sm bg-stone-50 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 focus:bg-white transition-all"
-            />
-          </div>
+    <section className="pm-table-card">
+      <div className="pm-table-toolbar">
+        <div>
+          <h2>
+            Customer accounts <span>{withAccount}</span>
+          </h2>
+          <p>{withoutAccount} customers do not have a login yet.</p>
         </div>
+        <button
+          className="pm-button pm-primary"
+          onClick={() => setShowCreate(true)}
+        >
+          <Icon name="plus" size={16} />
+          Create login
+        </button>
       </div>
-
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
-        {/* Customers without accounts */}
-        {withoutAccount > 0 && (
-          <div className="bg-amber-50 border border-amber-100 rounded-3xl p-4">
-            <p className="text-xs font-black uppercase tracking-widest text-amber-600 mb-2">
-              ⚠️ {withoutAccount} customer{withoutAccount !== 1 ? "s" : ""}{" "}
-              without a login
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {customers
-                .filter((c) => !c.hasAccount)
-                .map((c) => (
-                  <span
-                    key={c.id}
-                    className="text-xs font-bold px-2.5 py-1 bg-white border border-amber-200 rounded-full text-amber-700"
-                  >
-                    {c.customer_name}
-                  </span>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* Account list */}
-        {loading ? (
-          <div className="text-center py-20">
-            <div className="text-4xl mb-3 animate-pulse">🔑</div>
-            <p className="text-stone-400 font-semibold text-sm">
-              Loading accounts…
-            </p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-stone-100 shadow-sm">
-            <p className="text-4xl mb-3">🔑</p>
-            <p className="text-stone-400 font-bold">
-              {accounts.length === 0
-                ? "No customer accounts yet"
-                : "No results found"}
-            </p>
-            {accounts.length === 0 && (
-              <p className="text-xs text-stone-300 mt-1">
-                Click "+ Create Login" to get started
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
+      <div className="pm-table-controls">
+        <label className="pm-search">
+          <Icon name="search" size={16} />
+          <input
+            aria-label="Search customer accounts"
+            placeholder="Search by name or reference…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="pm-table-scroll">
+        <table className="pm-data-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Reference</th>
+              <th>Account status</th>
+              <th>Created</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
             {filtered.map((a) => (
-              <div
-                key={a.userId}
-                className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden"
-              >
-                <div
-                  className="h-1"
-                  style={{
-                    background: "linear-gradient(90deg,#14b8a6,#0d9488)",
-                  }}
-                />
-                <div className="p-5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-teal-50 flex items-center justify-center text-lg font-black text-teal-600 flex-shrink-0">
-                      {a.customerName.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-black text-stone-800">
-                        {a.customerName}
-                      </p>
-                      <p className="text-xs text-stone-400 font-mono">
-                        {a.customerRef}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${a.isActive ? "bg-teal-400" : "bg-stone-300"}`}
-                        />
-                        <span className="text-[11px] text-stone-400">
-                          {a.isActive ? "Active" : "Inactive"} · Created{" "}
-                          {new Date(a.createdAt).toLocaleDateString("en-MY", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    </div>
+              <tr key={a.userId}>
+                <td>
+                  <div className="pm-customer-name">
+                    <span className="pm-avatar">
+                      {a.customerName
+                        .split(" ")
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join("")}
+                    </span>
+                    <span>
+                      <strong>{a.customerName}</strong>
+                      <small>{a.fullName}</small>
+                    </span>
                   </div>
-                  <button
-                    onClick={() => setReset(a)}
-                    className="px-3 py-2 rounded-xl border border-stone-200 text-xs font-black text-stone-500 hover:border-teal-300 hover:text-teal-600 transition-all whitespace-nowrap"
+                </td>
+                <td>{a.customerRef}</td>
+                <td>
+                  <span
+                    className={
+                      "pm-status " + (a.isActive ? "member" : "neutral")
+                    }
                   >
-                    Reset PW
+                    <i />
+                    {a.isActive ? "Active" : "Disabled"}
+                  </span>
+                </td>
+                <td>
+                  {new Date(a.createdAt).toLocaleDateString("en-MY", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </td>
+                <td className="pm-right">
+                  <button className="pm-button" onClick={() => setReset(a)}>
+                    Reset password
                   </button>
-                </div>
-              </div>
+                </td>
+              </tr>
             ))}
-          </div>
-        )}
+          </tbody>
+        </table>
       </div>
-
+      {!filtered.length && (
+        <div className="pm-empty">
+          <Icon name="lock" size={30} />
+          <h3>{loading ? "Loading accounts…" : "No customer accounts"}</h3>
+          <p>Create a login to give a customer access to their own records.</p>
+        </div>
+      )}
+      <div className="pm-table-footer">
+        <span>{filtered.length} accounts</span>
+        <a href="/staff" className="pm-text-button">
+          Manage account access
+        </a>
+      </div>
       {showCreate && (
         <CreateAccountModal
           customers={customers}
@@ -611,22 +585,17 @@ export default function AccountsPage({
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false);
-            load();
+            void load();
           }}
         />
       )}
-
       {resetTarget && (
         <ResetPasswordModal
           account={resetTarget}
           session={session}
-          onClose={() => {
-            setReset(null);
-          }}
+          onClose={() => setReset(null)}
         />
       )}
-
-      <style>{`@keyframes popIn{from{opacity:0;transform:scale(.95) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
-    </div>
+    </section>
   );
 }

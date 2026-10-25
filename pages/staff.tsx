@@ -1,3 +1,5 @@
+import Drawer from "@/components/Drawer";
+import Icon from "@/components/Icon";
 import { useEffect, useState } from "react";
 type User = {
   id: string;
@@ -32,112 +34,184 @@ export default function Staff() {
   useEffect(() => {
     void load();
   }, []);
+
+  const [creating, setCreating] = useState(false);
   return (
-    <main className="min-h-screen bg-teal-50 p-4 sm:p-8">
-      <section className="max-w-3xl mx-auto space-y-6">
-        <a className="text-teal-800 underline" href="/">
-          Back to PetMan
-        </a>
-        <h1 className="text-3xl font-bold">Users & permissions</h1>
-        <p className="text-stone-700">
-          Admins manage the salon. Customer accounts can view only their linked
-          records. Create customer logins from Customer Accounts in PetMan.
-        </p>
-        <p role="alert" className="text-red-700">
-          {error}
-        </p>
-        <div className="space-y-3">
-          {users.map((u) => (
-            <article
-              key={u.id}
-              className="bg-white border rounded-xl p-5 flex flex-wrap gap-4 items-center justify-between"
-            >
-              <div>
-                <h2 className="font-bold">{u.full_name}</h2>
-                <p>{u.email}</p>
-                <p className="text-sm text-stone-600">
-                  {u.role} · {u.is_active ? "Active" : "Disabled"}
-                </p>
-              </div>
-              <button
-                disabled={busy}
-                className="border rounded-lg px-4 py-3 hover:bg-stone-100 disabled:opacity-50"
-                onClick={async () => {
-                  setBusy(true);
-                  setError("");
-                  try {
-                    await request("/api/admin/toggle-user", {
-                      userId: u.id,
-                      active: !u.is_active,
-                    });
-                    await load();
-                  } catch (e) {
-                    setError(e instanceof Error ? e.message : "Update failed");
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                {u.is_active ? "Disable" : "Enable"}
-              </button>
-            </article>
-          ))}
-        </div>
-        <form
-          className="bg-white border rounded-xl p-6 space-y-4"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            setBusy(true);
-            setError("");
-            try {
-              await request(
-                "/api/admin/create-staff",
-                Object.fromEntries(new FormData(form)),
-              );
-              form.reset();
-              await load();
-            } catch (e) {
-              setError(
-                e instanceof Error ? e.message : "Account creation failed",
-              );
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <h2 className="text-xl font-bold">Add administrator</h2>
-          <p className="text-sm text-stone-600">
-            This account will have full access. Give the initial password to the
-            staff member through a private channel.
-          </p>
-          {[
-            ["name", "Name", "text"],
-            ["email", "Email", "email"],
-            ["password", "Initial password (12+ characters)", "password"],
-          ].map(([name, label, type]) => (
-            <label key={name} className="block">
-              {label}
-              <input
-                name={name}
-                type={type}
-                required
-                minLength={name === "password" ? 12 : undefined}
-                autoComplete={name === "password" ? "new-password" : name}
-                className="block w-full p-3 border border-stone-300 rounded-lg mt-1"
-              />
-            </label>
-          ))}
+    <div className="pm-staff-page">
+      <section className="pm-table-card">
+        <div className="pm-table-toolbar">
+          <div>
+            <h2>
+              Team & customer access <span>{users.length}</span>
+            </h2>
+            <p>Manage who can sign in and access salon records.</p>
+          </div>
           <button
-            disabled={busy}
-            className="bg-teal-700 text-white px-5 py-3 rounded-lg disabled:opacity-50"
+            className="pm-button pm-primary"
+            onClick={() => setCreating(true)}
           >
-            {busy ? "Saving…" : "Create administrator"}
+            <Icon name="plus" size={16} />
+            Add administrator
           </button>
-        </form>
-        <PasswordForm />
+        </div>
+        {error && (
+          <p role="alert" className="pm-inline-error">
+            {error}
+          </p>
+        )}
+        <div className="pm-table-scroll">
+          <table className="pm-data-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th className="pm-right">Account access</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>
+                    <div className="pm-customer-name">
+                      <span className="pm-avatar">
+                        {u.full_name
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .slice(0, 2)
+                          .join("")}
+                      </span>
+                      <span>
+                        <strong>{u.full_name}</strong>
+                        <small>{u.email}</small>
+                      </span>
+                    </div>
+                  </td>
+                  <td>{u.role === "admin" ? "Administrator" : "Customer"}</td>
+                  <td>
+                    <span
+                      className={
+                        "pm-status " + (u.is_active ? "member" : "neutral")
+                      }
+                    >
+                      <i />
+                      {u.is_active ? "Active" : "Disabled"}
+                    </span>
+                  </td>
+                  <td className="pm-right">
+                    <button
+                      disabled={busy}
+                      className="pm-button"
+                      onClick={async () => {
+                        setBusy(true);
+                        setError("");
+                        try {
+                          await request("/api/admin/toggle-user", {
+                            userId: u.id,
+                            active: !u.is_active,
+                          });
+                          await load();
+                        } catch (e) {
+                          setError(
+                            e instanceof Error ? e.message : "Update failed",
+                          );
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      {u.is_active ? "Disable account" : "Enable account"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="pm-table-footer">
+          <span>
+            Admins have full salon access. Customers see their own records.
+          </span>
+          <a className="pm-text-button" href="/?section=accounts">
+            Create customer login
+          </a>
+        </div>
       </section>
-    </main>
+      <div className="pm-password-section">
+        <PasswordForm />
+      </div>
+      {creating && (
+        <Drawer
+          title="New administrator"
+          eyebrow="Users & permissions"
+          onClose={() => setCreating(false)}
+        >
+          <form
+            className="pm-drawer-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              setBusy(true);
+              setError("");
+              try {
+                await request(
+                  "/api/admin/create-staff",
+                  Object.fromEntries(new FormData(form)),
+                );
+                form.reset();
+                setCreating(false);
+                await load();
+              } catch (e) {
+                setError(
+                  e instanceof Error ? e.message : "Account creation failed",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p>
+              This account will have full access to salon records. Share the
+              initial password privately.
+            </p>
+            {[
+              ["name", "Full name", "text"],
+              ["email", "Email address", "email"],
+              ["password", "Initial password", "password"],
+            ].map(([name, label, type]) => (
+              <label key={name}>
+                {label}
+                <input
+                  name={name}
+                  type={type}
+                  required
+                  minLength={name === "password" ? 12 : undefined}
+                  autoComplete={name === "password" ? "new-password" : name}
+                />
+                {name === "password" && <small>At least 12 characters.</small>}
+              </label>
+            ))}
+            {error && (
+              <p role="alert" className="pm-inline-error">
+                {error}
+              </p>
+            )}
+            <div className="pm-drawer-actions">
+              <button
+                type="button"
+                className="pm-button"
+                onClick={() => setCreating(false)}
+              >
+                Cancel
+              </button>
+              <button disabled={busy} className="pm-button pm-primary">
+                {busy ? "Creating…" : "Create administrator"}
+              </button>
+            </div>
+          </form>
+        </Drawer>
+      )}
+    </div>
   );
 }
 function PasswordForm() {
