@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "d1_databases": [
+    {
+      "binding": "PREVIEW_DB",
+      "database_name": "petman-preview",
+      "database_id": "76cc2ad1-9cc2-486d-a9cb-01ee88de8a18",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

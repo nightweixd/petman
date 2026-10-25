@@ -22,4 +22,17 @@
     "BUSINESS_TIMEZONE": "Asia/Kuala_Lumpur",
   },
   "observability": { "enabled": true, "head_sampling_rate": 1 },
+  // Preview bindings are explicit: never connect PR builds to live customer data.
+  "previews": {
+    "vars": {
+      "APP_ORIGIN": "https://codex-admin-reference-redesign-petman.fongjunweii.workers.dev",
+      "BUSINESS_TIMEZONE": "Asia/Kuala_Lumpur",
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_id": "76cc2ad1-9cc2-486d-a9cb-01ee88de8a18",
+      },
+    ],
+  },
 }
