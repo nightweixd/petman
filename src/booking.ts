@@ -1,3 +1,4 @@
+import { availability, quarterSlots } from "./scheduling";
 import { z } from "zod";
 export const slots = [
   "09:00",
@@ -21,7 +22,8 @@ const date = z
 export const bookingSchema = z.object({
   serviceId: z.string().max(100),
   date,
-  slot: z.enum(slots as [string, ...string[]]),
+  slot: z.string().regex(/^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/),
+  groomerId: z.string().max(100).optional(),
   name: z.string().trim().min(1).max(100),
   phone: z
     .string()
@@ -85,16 +87,39 @@ export async function requestBooking(
   if (!validSlot(input.date, input.slot, timezone))
     throw new BookingError("Choose a future slot within 90 days.", 400);
   const service = await db
-    .prepare("SELECT name,price_cents FROM services WHERE id=? AND active=1")
+    .prepare(
+      "SELECT name,price_cents,duration_minutes,buffer_minutes FROM services WHERE id=? AND active=1",
+    )
     .bind(input.serviceId)
-    .first<{ name: string; price_cents: number }>();
+    .first<{
+      name: string;
+      price_cents: number;
+      duration_minutes: number;
+      buffer_minutes: number;
+    }>();
   if (!service)
     throw new BookingError("Package unavailable. Please choose another.", 400);
+  const available = await availability(
+    db,
+    input.date,
+    timezone,
+    input.serviceId,
+  );
+  const choice = available.options.find(
+    (o) =>
+      o.slot === input.slot &&
+      (!input.groomerId || o.groomerId === input.groomerId),
+  );
+  if (!choice)
+    throw new BookingError(
+      "That time is unavailable. Choose another slot.",
+      409,
+    );
   const id = crypto.randomUUID();
   try {
-    await db
+    const insert = db
       .prepare(
-        "INSERT INTO bookings(id,service_id,service_name,price_cents,date,slot,details,customer_id,pet_id) VALUES(?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO bookings(id,service_id,service_name,price_cents,date,slot,details,customer_id,pet_id,groomer_id,duration_minutes,buffer_minutes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
       )
       .bind(
         id,
@@ -106,8 +131,24 @@ export async function requestBooking(
         JSON.stringify(input),
         customerId,
         petId,
-      )
-      .run();
+        choice.groomerId,
+        service.duration_minutes,
+        service.buffer_minutes,
+      );
+    await db.batch([
+      insert,
+      ...quarterSlots(
+        input.slot,
+        service.duration_minutes,
+        service.buffer_minutes,
+      ).map((slot) =>
+        db
+          .prepare(
+            "INSERT INTO booking_occupancy(booking_id,date,slot,groomer_id) VALUES(?,?,?,?)",
+          )
+          .bind(id, input.date, slot, choice.groomerId),
+      ),
+    ]);
   } catch (error) {
     if (String(error).includes("UNIQUE"))
       throw new BookingError(
@@ -137,7 +178,7 @@ export function validSlot(day: string, slot: string, timezone: string) {
   return (
     days >= 0 &&
     days <= 90 &&
-    slots.includes(slot) &&
+    /^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/.test(slot) &&
     (day !== today || slot > `${parts.hour}:${parts.minute}`)
   );
 }
@@ -146,11 +187,12 @@ export async function transitionBooking(
   actor: string,
   input: unknown,
 ) {
-  const { id, status, customerId } = z
+  const { id, status, customerId, petId } = z
     .object({
       id: z.string().uuid(),
       status: z.enum(["confirmed", "completed", "cancelled"]),
       customerId: z.string().uuid().optional(),
+      petId: z.string().uuid().optional(),
     })
     .parse(input);
   const booking = await db
@@ -171,6 +213,8 @@ export async function transitionBooking(
   const details = bookingSchema.parse(JSON.parse(booking.details));
   const statements: D1PreparedStatement[] = [];
   if (status === "confirmed" && booking.status === "pending") {
+    if (booking.pet_id && petId && booking.pet_id !== petId)
+      throw new BookingError("This request is already linked to a pet.", 409);
     if (booking.customer_id && customerId && customerId !== booking.customer_id)
       throw new BookingError(
         "This request is already linked to a customer.",
@@ -178,11 +222,11 @@ export async function transitionBooking(
       );
     const linkedCustomer = booking.customer_id ?? customerId;
     const customer = linkedCustomer ?? crypto.randomUUID(),
-      pet = booking.pet_id ?? crypto.randomUUID();
+      pet = booking.pet_id ?? petId ?? crypto.randomUUID();
     if (
       linkedCustomer &&
       !(await db
-        .prepare("SELECT id FROM customers WHERE id=?")
+        .prepare("SELECT id FROM customers WHERE id=? AND archived_at IS NULL")
         .bind(customer)
         .first())
     )
@@ -195,7 +239,16 @@ export async function transitionBooking(
           )
           .bind(customer, "WEB-" + customer.slice(0, 8), details.name),
       );
-    if (!booking.pet_id)
+    if (
+      petId &&
+      (!linkedCustomer ||
+        !(await db
+          .prepare("SELECT id FROM pets WHERE id=? AND customer_id=?")
+          .bind(petId, linkedCustomer)
+          .first()))
+    )
+      throw new Error("Pet does not belong to this customer");
+    if (!booking.pet_id && !petId)
       statements.push(
         db
           .prepare(
@@ -257,7 +310,7 @@ export async function transitionBooking(
   } else if (
     status === "cancelled" &&
     ["pending", "confirmed"].includes(booking.status)
-  )
+  ) {
     statements.push(
       db
         .prepare(
@@ -265,7 +318,10 @@ export async function transitionBooking(
         )
         .bind(id),
     );
-  else throw new Error("Invalid booking transition");
+    statements.push(
+      db.prepare("DELETE FROM booking_occupancy WHERE booking_id=?").bind(id),
+    );
+  } else throw new Error("Invalid booking transition");
   // One transition from each state: competing staff actions roll back atomically.
   statements.unshift(
     db

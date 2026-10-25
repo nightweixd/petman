@@ -23,6 +23,8 @@ class Query implements PromiseLike<Result> {
     rows?: Row[];
     values?: Row;
     single: boolean;
+    limit?: number;
+    offset?: number;
   };
   constructor(table: string) {
     this.request = {
@@ -71,21 +73,46 @@ class Query implements PromiseLike<Result> {
     this.request.single = true;
     return this;
   }
+  range(from: number, to: number) {
+    this.request.offset = from;
+    this.request.limit = to - from + 1;
+    return this;
+  }
+  limit(n: number) {
+    this.request.limit = n;
+    return this;
+  }
   async run(): Promise<Result> {
     try {
-      const response = await fetch("/api/data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(this.request),
-      });
-      const body = (await response.json()) as Result;
-      if (!response.ok)
-        throw new Error(
-          typeof body.error === "string"
-            ? body.error
-            : (body.error?.message ?? "Request failed"),
-        );
-      return body;
+      const paged =
+        this.request.action === "select" &&
+        !this.request.single &&
+        this.request.limit === undefined;
+      const all: Row[] = [];
+      let offset = 0;
+      do {
+        const request = paged
+          ? { ...this.request, limit: 1000, offset }
+          : this.request;
+        const response = await fetch("/api/data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+        });
+        const body = (await response.json()) as Result;
+        if (!response.ok)
+          throw new Error(
+            typeof body.error === "string"
+              ? body.error
+              : (body.error?.message ?? "Request failed"),
+          );
+        if (!paged) return body;
+        const rows = body.data as Row[];
+        all.push(...rows);
+        if (rows.length < 1000) break;
+        offset += 1000;
+      } while (offset <= 10000000);
+      return { data: all, error: null };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Request failed";
       if (typeof window !== "undefined")

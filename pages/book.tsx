@@ -31,9 +31,11 @@ const emptyDetails = {
 export default function Book({
   session,
   loading: sessionLoading,
+  accountRole,
 }: {
   session: Session | null;
   loading: boolean;
+  accountRole?: string | null;
 }) {
   const router = useRouter();
   const [services, setServices] = useState<Service[]>([]),
@@ -79,7 +81,8 @@ export default function Book({
     setHome(null);
     setAccountError("");
     setPet("");
-    if (!session) {
+    if (session && !accountRole) return;
+    if (!session || accountRole === "admin") {
       setAccountLoading(false);
       return;
     }
@@ -103,7 +106,7 @@ export default function Book({
         if (!controller.signal.aborted) setAccountLoading(false);
       });
     return () => controller.abort();
-  }, [session?.user.id]);
+  }, [session?.user.id, accountRole]);
   useEffect(() => {
     if (!home) return;
     const selected = home.pets.find((p) => p.id === router.query.pet);
@@ -124,10 +127,16 @@ export default function Book({
     setSlot("");
     setSlots([]);
     setSlotsLoading(false);
-    if (!date) return;
+    if (!date || !serviceId) return;
     const controller = new AbortController();
     setSlotsLoading(true);
-    fetch("/api/public/slots?date=" + date, { signal: controller.signal })
+    fetch(
+      "/api/public/slots?date=" +
+        date +
+        "&serviceId=" +
+        encodeURIComponent(serviceId),
+      { signal: controller.signal },
+    )
       .then(async (r) => {
         if (!r.ok)
           throw new Error("Unable to load times. Try another date or retry.");
@@ -144,7 +153,7 @@ export default function Book({
         if (!controller.signal.aborted) setSlotsLoading(false);
       });
     return () => controller.abort();
-  }, [date, reload]);
+  }, [date, reload, serviceId]);
   useEffect(() => {
     const zone = timezone || "Asia/Kuala_Lumpur";
     const day = (d: Date) => {
@@ -672,7 +681,7 @@ export default function Book({
                         busy ||
                         accountLoading ||
                         sessionLoading ||
-                        (!!session && !home)
+                        (!!session && !home && accountRole !== "admin")
                       }
                     >
                       {busy ? "Sending request…" : "Request booking"}
