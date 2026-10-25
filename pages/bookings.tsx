@@ -1,3 +1,5 @@
+import Drawer from "@/components/Drawer";
+import Icon from "@/components/Icon";
 import { useEffect, useState } from "react";
 import { database } from "@/lib/database";
 type Booking = {
@@ -71,55 +73,291 @@ export default function Bookings() {
         ...(matches[b.id] ? { customerId: matches[b.id] } : {}),
       });
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
+      return false;
     } finally {
       setBusy(false);
     }
   }
+
+  const [tab, setTab] = useState("requests"),
+    [status, setStatus] = useState("all"),
+    [search, setSearch] = useState(""),
+    [selected, setSelected] = useState<Booking | null>(null),
+    [creating, setCreating] = useState(false);
+  const filtered = bookings.filter(
+    (b) =>
+      (status === "all" || b.status === status) &&
+      [b.details.name, b.details.petName, b.service_name].some((v) =>
+        v.toLowerCase().includes(search.toLowerCase()),
+      ),
+  );
   return (
-    <main className="min-h-screen bg-teal-50 p-4 sm:p-8">
-      <section className="max-w-3xl mx-auto space-y-6">
-        <a className="underline text-teal-800" href="/">
-          Back to PetMan
-        </a>
-        <h1 className="text-3xl font-bold">Bookings & packages</h1>
-        <p>
-          Share{" "}
-          <a className="underline text-teal-800" href="/book">
-            the booking page
-          </a>{" "}
-          with customers. One appointment per hour, 09:00–17:00, in the
-          configured salon timezone. No online payments.
-        </p>
-        <p role="alert" className="text-red-700">
+    <div>
+      <div className="pm-page-tabs">
+        <button
+          className={tab === "requests" ? "is-active" : ""}
+          onClick={() => setTab("requests")}
+        >
+          Booking requests{" "}
+          <span>{bookings.filter((b) => b.status === "pending").length}</span>
+        </button>
+        <button
+          className={tab === "packages" ? "is-active" : ""}
+          onClick={() => setTab("packages")}
+        >
+          Service packages
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="pm-inline-error">
           {error}
         </p>
-        <h2 className="text-xl font-bold">Booking requests</h2>
-        {!bookings.length && <p>No booking requests yet.</p>}
-        {bookings.map((b) => (
-          <article
-            key={b.id}
-            className="bg-white border rounded-xl p-5 space-y-3"
-          >
-            <h3 className="font-bold">
-              {b.details.petName} · {b.service_name}
-            </h3>
-            <p>
-              {b.date} at {b.slot} · {b.status}
-            </p>
-            <p>
-              {b.details.name} · {b.details.phone} · {b.details.email}
-            </p>
-            {b.status === "pending" && (
-              <label className="block">
+      )}
+      {tab === "requests" ? (
+        <section className="pm-table-card">
+          <div className="pm-table-toolbar">
+            <div>
+              <h2>
+                All bookings <span>{bookings.length}</span>
+              </h2>
+              <p>
+                Review requests, confirm appointments and record completed
+                visits.
+              </p>
+            </div>
+            <a className="pm-button pm-primary" href="/book" target="_blank">
+              Booking page
+              <Icon name="arrow" size={15} />
+            </a>
+          </div>
+          <div className="pm-table-controls">
+            <label className="pm-search">
+              <Icon name="search" size={17} />
+              <input
+                aria-label="Search bookings"
+                placeholder="Search customer, pet or package…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+            <select
+              className="pm-control-select"
+              aria-label="Booking status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              {["all", "pending", "confirmed", "completed", "cancelled"].map(
+                (v) => (
+                  <option key={v} value={v}>
+                    {v === "all"
+                      ? "All statuses"
+                      : v[0].toUpperCase() + v.slice(1)}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+          <div className="pm-table-scroll">
+            <table className="pm-data-table">
+              <thead>
+                <tr>
+                  <th>Customer & pet</th>
+                  <th>Package</th>
+                  <th>Date & time</th>
+                  <th>Status</th>
+                  <th className="pm-right">Amount</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((b) => (
+                  <tr key={b.id}>
+                    <td>
+                      <button
+                        className="pm-customer-name"
+                        onClick={() => setSelected(b)}
+                      >
+                        <span className="pm-avatar">
+                          {b.details.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .slice(0, 2)
+                            .join("")}
+                        </span>
+                        <span>
+                          <strong>{b.details.name}</strong>
+                          <small>{b.details.petName}</small>
+                        </span>
+                      </button>
+                    </td>
+                    <td>{b.service_name}</td>
+                    <td>
+                      <div className="pm-pet-cell">
+                        <span>{b.date}</span>
+                        <small>{b.slot}</small>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={"pm-status " + b.status}>
+                        <i />
+                        {b.status[0].toUpperCase() + b.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="pm-right pm-amount">
+                      RM {(b.price_cents / 100).toFixed(2)}
+                    </td>
+                    <td>
+                      <button
+                        className="pm-icon-button"
+                        aria-label={"View booking for " + b.details.petName}
+                        onClick={() => setSelected(b)}
+                      >
+                        <Icon name="chevron" size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!filtered.length && (
+            <div className="pm-empty">
+              <Icon name="calendar" size={30} />
+              <h3>No bookings found</h3>
+              <p>
+                New requests will appear here when customers use your booking
+                page.
+              </p>
+            </div>
+          )}
+          <div className="pm-table-footer">
+            <span>{filtered.length} bookings</span>
+            <span>One-hour appointments · Salon timezone</span>
+          </div>
+        </section>
+      ) : (
+        <section className="pm-table-card">
+          <div className="pm-table-toolbar">
+            <div>
+              <h2>
+                Service packages <span>{services.length}</span>
+              </h2>
+              <p>Packages shown on your public booking page.</p>
+            </div>
+            <button
+              className="pm-button pm-primary"
+              onClick={() => setCreating(true)}
+            >
+              <Icon name="plus" size={16} />
+              Add package
+            </button>
+          </div>
+          <div className="pm-table-scroll">
+            <table className="pm-data-table">
+              <thead>
+                <tr>
+                  <th>Package name</th>
+                  <th>Duration</th>
+                  <th>Availability</th>
+                  <th className="pm-right">Amount</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {services.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <strong>{s.name}</strong>
+                    </td>
+                    <td>1 hour</td>
+                    <td>
+                      <span
+                        className={
+                          "pm-status " + (s.active ? "member" : "neutral")
+                        }
+                      >
+                        <i />
+                        {s.active ? "Available" : "Hidden"}
+                      </span>
+                    </td>
+                    <td className="pm-right pm-amount">
+                      RM {(s.price_cents / 100).toFixed(2)}
+                    </td>
+                    <td className="pm-right">
+                      <button
+                        disabled={busy}
+                        className="pm-button"
+                        onClick={async () => {
+                          setBusy(true);
+                          const r = await database
+                            .from("services")
+                            .update({ active: s.active ? 0 : 1 })
+                            .eq("id", s.id);
+                          if (r.error) setError(r.error.message);
+                          await load();
+                          setBusy(false);
+                        }}
+                      >
+                        {s.active ? "Hide package" : "Show package"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!services.length && (
+            <div className="pm-empty">
+              <Icon name="calendar" size={30} />
+              <h3>No service packages yet</h3>
+              <p>Add your first package to open online booking.</p>
+            </div>
+          )}
+        </section>
+      )}
+      {selected && (
+        <Drawer
+          title={selected.details.petName}
+          eyebrow="Bookings / Request details"
+          onClose={() => setSelected(null)}
+        >
+          <div className="pm-drawer-form">
+            <section className="pm-record-summary">
+              <span className={"pm-status " + selected.status}>
+                <i />
+                {selected.status}
+              </span>
+              <h3>{selected.service_name}</h3>
+              <p>
+                {selected.date} at {selected.slot} · RM{" "}
+                {(selected.price_cents / 100).toFixed(2)}
+              </p>
+            </section>
+            <dl className="pm-record-fields">
+              <div>
+                <dt>Customer</dt>
+                <dd>{selected.details.name}</dd>
+              </div>
+              <div>
+                <dt>Phone</dt>
+                <dd>{selected.details.phone}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>{selected.details.email || "Not provided"}</dd>
+              </div>
+            </dl>
+            {selected.status === "pending" && (
+              <label>
                 Membership record
                 <select
-                  value={matches[b.id] ?? ""}
+                  value={matches[selected.id] ?? ""}
                   onChange={(e) =>
-                    setMatches((m) => ({ ...m, [b.id]: e.target.value }))
+                    setMatches((m) => ({ ...m, [selected.id]: e.target.value }))
                   }
-                  className="block w-full mt-1 border rounded-lg p-3"
                 >
                   <option value="">Create a new customer and membership</option>
                   {customers.map((c) => (
@@ -128,75 +366,65 @@ export default function Bookings() {
                     </option>
                   ))}
                 </select>
-                <span className="text-sm text-stone-600">
-                  Verify identity with the customer before linking to an
-                  existing record. A new pet record will be added.
-                </span>
+                <small>
+                  Verify identity before linking an existing customer. A new pet
+                  record will be added.
+                </small>
               </label>
             )}
-            <div className="flex flex-wrap gap-3">
-              {b.status === "pending" && (
+            <p className="pm-form-note">
+              Confirming captures the customer and pet details in your records.
+              No online payment is collected.
+            </p>
+            <div className="pm-drawer-actions">
+              {["pending", "confirmed"].includes(selected.status) && (
                 <button
                   disabled={busy}
-                  className="rounded-lg p-3 bg-teal-800 text-white"
-                  onClick={() => transition(b, "confirmed")}
-                >
-                  Confirm & capture membership
-                </button>
-              )}
-              {b.status === "confirmed" && (
-                <button
-                  disabled={busy}
-                  className="rounded-lg p-3 bg-teal-800 text-white"
-                  onClick={() => transition(b, "completed")}
-                >
-                  Complete visit ({(b.price_cents / 100).toFixed(2)})
-                </button>
-              )}
-              {["pending", "confirmed"].includes(b.status) && (
-                <button
-                  disabled={busy}
-                  className="rounded-lg border p-3"
-                  onClick={() => transition(b, "cancelled")}
+                  className="pm-button"
+                  onClick={async () => {
+                    if (await transition(selected, "cancelled"))
+                      setSelected(null);
+                  }}
                 >
                   Cancel booking
                 </button>
               )}
+              {selected.status === "pending" && (
+                <button
+                  disabled={busy}
+                  className="pm-button pm-primary"
+                  onClick={async () => {
+                    if (await transition(selected, "confirmed"))
+                      setSelected(null);
+                  }}
+                >
+                  {busy ? "Confirming…" : "Confirm booking"}
+                </button>
+              )}
+              {selected.status === "confirmed" && (
+                <button
+                  disabled={busy}
+                  className="pm-button pm-primary"
+                  onClick={async () => {
+                    if (await transition(selected, "completed"))
+                      setSelected(null);
+                  }}
+                >
+                  {busy ? "Saving…" : "Complete visit"}
+                </button>
+              )}
             </div>
-          </article>
-        ))}
-        <section className="bg-white rounded-xl border p-6 space-y-4">
-          <h2 className="text-xl font-bold">Service packages</h2>
-          <p className="text-sm text-stone-600">
-            All packages use a one-hour slot. The listed amount is saved on each
-            booking; discounts and payment collection are handled by staff.
-          </p>
-          {services.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-4">
-              <p>
-                {s.name} · {(s.price_cents / 100).toFixed(2)} ·{" "}
-                {s.active ? "Available" : "Hidden"}
-              </p>
-              <button
-                disabled={busy}
-                className="border p-3 rounded-lg"
-                onClick={async () => {
-                  setBusy(true);
-                  const r = await database
-                    .from("services")
-                    .update({ active: s.active ? 0 : 1 })
-                    .eq("id", s.id);
-                  if (r.error) setError(r.error.message);
-                  await load();
-                  setBusy(false);
-                }}
-              >
-                {s.active ? "Hide" : "Show"}
-              </button>
-            </div>
-          ))}
+          </div>
+        </Drawer>
+      )}
+      {creating && (
+        <Drawer
+          title="New service package"
+          eyebrow="Bookings / Service packages"
+          onClose={() => setCreating(false)}
+        >
           <form
-            className="space-y-4 border-t pt-4"
+            className="pm-drawer-form"
             onSubmit={async (e) => {
               e.preventDefault();
               const form = e.currentTarget,
@@ -210,17 +438,24 @@ export default function Bookings() {
                   price_cents: Math.round(Number(f.get("price")) * 100),
                 });
               if (r.error) setError(r.error.message);
-              else form.reset();
+              else {
+                form.reset();
+                setCreating(false);
+              }
               await load();
               setBusy(false);
             }}
           >
+            <p>
+              Add the package name, details and quoted amount customers will see
+              when booking.
+            </p>
             {[
               ["name", "Package name", "text"],
               ["description", "Description", "text"],
-              ["price", "Amount", "number"],
+              ["price", "Amount (RM)", "number"],
             ].map(([name, label, type]) => (
-              <label key={name} className="block">
+              <label key={name}>
                 {label}
                 <input
                   name={name}
@@ -229,16 +464,33 @@ export default function Bookings() {
                   min={type === "number" ? 0 : undefined}
                   step={type === "number" ? ".01" : undefined}
                   maxLength={300}
-                  className="block w-full border rounded-lg p-3"
                 />
               </label>
             ))}
-            <button disabled={busy} className="p-3 border rounded-lg">
-              Add package
-            </button>
+            <p className="pm-form-note">
+              Each package uses a one-hour slot. Discounts and payments are
+              handled by staff.
+            </p>
+            {error && (
+              <p className="pm-inline-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="pm-drawer-actions">
+              <button
+                type="button"
+                className="pm-button"
+                onClick={() => setCreating(false)}
+              >
+                Cancel
+              </button>
+              <button disabled={busy} className="pm-button pm-primary">
+                {busy ? "Saving…" : "Add package"}
+              </button>
+            </div>
           </form>
-        </section>
-      </section>
-    </main>
+        </Drawer>
+      )}
+    </div>
   );
 }

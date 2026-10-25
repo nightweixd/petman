@@ -1,4 +1,8 @@
 import "@/pages/globals.css";
+import "@fontsource-variable/manrope";
+import "@/styles/admin.css";
+import AdminShell, { AdminNavigation } from "@/components/AdminShell";
+import { useRouter } from "next/router";
 import type { AppProps } from "next/app";
 import { useEffect, useState } from "react";
 import { database } from "@/lib/database";
@@ -8,6 +12,25 @@ export default function App({ Component, pageProps }: AppProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [role, setRole] = useState<string | null>(null);
+  const [view, setView] = useState("list");
+  const router = useRouter();
+  useEffect(() => {
+    let current = true;
+    setRole(null);
+    if (session)
+      void database
+        .from("user_profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single()
+        .then(({ data }) => {
+          if (current) setRole(data?.role ?? null);
+        });
+    return () => {
+      current = false;
+    };
+  }, [session?.user.id]);
 
   useEffect(() => {
     database.auth
@@ -49,7 +72,17 @@ export default function App({ Component, pageProps }: AppProps) {
           </button>
         </div>
       )}
-      <Component {...pageProps} session={session} loading={loading} />
+      <AdminNavigation.Provider value={{ view, setView }}>
+        {session &&
+        role === "admin" &&
+        !["/book", "/setup"].includes(router.pathname) ? (
+          <AdminShell session={session}>
+            <Component {...pageProps} session={session} loading={loading} />
+          </AdminShell>
+        ) : (
+          <Component {...pageProps} session={session} loading={loading} />
+        )}
+      </AdminNavigation.Provider>
     </>
   );
 }

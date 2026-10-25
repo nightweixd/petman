@@ -14,10 +14,11 @@
     "db:remote": "wrangler d1 migrations apply DB --remote",
     "dev:api": "wrangler dev",
     "build:web": "next build --webpack",
-    "format": "prettier --write \"src/**/*.ts\" \"lib/**/*.ts\" \"pages/**/*.tsx\" \"tests/*.mjs\""
+    "format": "prettier --write \"src/**/*.ts\" \"lib/**/*.ts\" \"pages/**/*.tsx\" \"components/**/*.tsx\" \"styles/*.css\" \"tests/*.mjs\""
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.12",
+    "@fontsource-variable/manrope": "5.3.0",
     "better-auth": "1.7.12",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.13",

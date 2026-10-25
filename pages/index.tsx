@@ -1,4 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
+import { AdminNavigation } from "@/components/AdminShell";
+import CustomerWorkspace from "@/components/CustomerWorkspace";
+import Drawer, { useModalFocus } from "@/components/Drawer";
+import Icon from "@/components/Icon";
+import { useState, useEffect, useCallback, useContext } from "react";
 import type { Session } from "@/lib/database";
 import {
   database,
@@ -20,16 +25,16 @@ import AccountsPage from "./accounts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PET_ICONS = {
-  Dog: "🐕",
-  Cat: "🐈",
-  Bird: "🐦",
-  Fish: "🐠",
-  Rabbit: "🐇",
-  Hamster: "🐹",
-  Other: "🐾",
+  Dog: <Icon name="paw" size={22} />,
+  Cat: <Icon name="paw" size={22} />,
+  Bird: <Icon name="paw" size={22} />,
+  Fish: <Icon name="paw" size={22} />,
+  Rabbit: <Icon name="paw" size={22} />,
+  Hamster: <Icon name="paw" size={22} />,
+  Other: <Icon name="paw" size={22} />,
 };
 const getPetIcon = (type: string) =>
-  PET_ICONS[type as keyof typeof PET_ICONS] || "🐾";
+  PET_ICONS[type as keyof typeof PET_ICONS] || <Icon name="paw" size={22} />;
 const APPT_TYPES = [
   "BG, BT",
   "FG, BT",
@@ -66,7 +71,7 @@ type Appointment = {
   pLeft: number;
   notes: string;
 };
-type Pet = {
+export type Pet = {
   id: string;
   petName: string;
   petType: string;
@@ -78,7 +83,7 @@ type Pet = {
   preferredGroomer: string;
   appointments: Appointment[];
 };
-type Customer = {
+export type Customer = {
   id: string;
   customerId: string;
   customerName: string;
@@ -129,12 +134,12 @@ function mapData(
 // ─── Badge ────────────────────────────────────────────────────────────────────
 function Badge({ type }: { type: string }) {
   const colors: Record<string, string> = {
-    Dog: "bg-amber-100 text-amber-700",
-    Cat: "bg-purple-100 text-purple-700",
-    Bird: "bg-sky-100 text-sky-700",
-    Fish: "bg-blue-100 text-blue-700",
-    Rabbit: "bg-pink-100 text-pink-700",
-    Hamster: "bg-orange-100 text-orange-700",
+    Dog: "bg-sky-50 text-sky-700",
+    Cat: "bg-stone-100 text-stone-600",
+    Bird: "bg-sky-50 text-sky-700",
+    Fish: "bg-sky-50 text-sky-700",
+    Rabbit: "bg-stone-100 text-stone-600",
+    Hamster: "bg-stone-100 text-stone-600",
   };
   return (
     <span
@@ -162,77 +167,50 @@ function LoginScreen() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: "linear-gradient(160deg,#f0faf9,#e0f2ef)" }}
-    >
-      <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
-        style={{ animation: "popIn .2s ease-out" }}
-      >
-        <div
-          className="h-1.5"
-          style={{ background: "linear-gradient(90deg,#14b8a6,#0d9488)" }}
-        />
-        <div className="px-8 pt-8 pb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-teal-500 flex items-center justify-center text-2xl shadow-lg shadow-teal-200">
-              🐾
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-stone-800">
-                PetMan Admin
-              </h1>
-              <p className="text-xs text-stone-400">
-                Sign in to manage your salon
-              </p>
-            </div>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-stone-400 mb-1 uppercase tracking-wider">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@yourgroomer.com"
-                required
-                autoFocus
-                className={INPUT_CLS}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-stone-400 mb-1 uppercase tracking-wider">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className={INPUT_CLS}
-              />
-            </div>
-            {error && (
-              <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-semibold">
-                ⚠ {error}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-teal-500 text-white text-sm font-black hover:bg-teal-600 active:scale-95 transition-all shadow-lg shadow-teal-200 disabled:opacity-60"
-            >
-              {loading ? "Signing in…" : "Sign In →"}
-            </button>
-          </form>
+    <main className="pm-login">
+      <section className="pm-login-card">
+        <div className="pm-login-brand">
+          <span>
+            <Icon name="paw" size={24} />
+          </span>
+          <strong>PetMan</strong>
         </div>
-      </div>
-      <style>{`@keyframes popIn{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
-    </div>
+        <h1>Sign in to your workspace</h1>
+        <p>Manage customers, appointments and memberships.</p>
+        <form onSubmit={handleLogin}>
+          <label htmlFor="login-email">Email address</label>
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+          />
+          <label htmlFor="login-password">Password</label>
+          <input
+            id="login-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {error && (
+            <p role="alert" className="pm-login-error">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={loading}>
+            {loading ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+        <a href="/book">
+          Looking to book an appointment? <Icon name="arrow" size={14} />
+        </a>
+      </section>
+    </main>
   );
 }
 
@@ -245,6 +223,7 @@ function AddModal({
   onClose: () => void;
   onAdd: (c: Customer) => void;
 }) {
+  const panelRef = useModalFocus(onClose);
   const [customerName, setCustomerName] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [petName, setPetName] = useState("");
@@ -320,6 +299,11 @@ function AddModal({
 
   return (
     <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="New customer & pet"
+      data-admin-panel="true"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(15,15,15,0.5)", backdropFilter: "blur(4px)" }}
     >
@@ -327,15 +311,25 @@ function AddModal({
         className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
         style={{ animation: "popIn .18s ease-out" }}
       >
+        <button
+          type="button"
+          className="pm-icon-button pm-panel-close"
+          onClick={onClose}
+          aria-label="Close panel"
+        >
+          <Icon name="close" size={16} />
+        </button>
         <div className="px-7 pt-6 pb-4 border-b border-stone-100 flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center text-xl shadow-lg shadow-teal-200">
-            🐾
+            <Icon name="paw" size={22} />
           </div>
           <div>
             <h2 className="text-lg font-black text-stone-800">
-              New Customer & Pet
+              New customer & pet
             </h2>
-            <p className="text-xs text-stone-400">Saved directly to database</p>
+            <p className="text-xs text-stone-400">
+              Keep customer and pet details together.
+            </p>
           </div>
         </div>
         <div className="px-7 py-5 space-y-4">
@@ -347,12 +341,13 @@ function AddModal({
               Customer Name *
             </label>
             <input
+              aria-label="Customer name"
               value={customerName}
               onChange={(e) => {
                 setCustomerName(e.target.value);
                 setErrors((x) => ({ ...x, customerName: "" }));
               }}
-              placeholder="e.g. Boyang"
+              placeholder="e.g. Alex Tan"
               className={`w-full px-3 py-2.5 rounded-xl border text-sm outline-none transition-all ${errCls("customerName")}`}
             />
             {errors.customerName && (
@@ -364,6 +359,7 @@ function AddModal({
               Customer ID
             </label>
             <input
+              aria-label="Customer reference"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
               placeholder="Auto-generated if empty"
@@ -378,12 +374,13 @@ function AddModal({
               Pet Name *
             </label>
             <input
+              aria-label="Pet name"
               value={petName}
               onChange={(e) => {
                 setPetName(e.target.value);
                 setErrors((x) => ({ ...x, petName: "" }));
               }}
-              placeholder="e.g. Bailey"
+              placeholder="e.g. Milo"
               className={`w-full px-3 py-2.5 rounded-xl border text-sm outline-none transition-all ${errCls("petName")}`}
             />
             {errors.petName && (
@@ -396,6 +393,7 @@ function AddModal({
             </label>
             <input
               list="pt-add"
+              aria-label="Pet type"
               value={petType}
               onChange={(e) => setPetType(e.target.value)}
               placeholder="e.g. Dog, Cat…"
@@ -412,6 +410,7 @@ function AddModal({
               Contact Number *
             </label>
             <input
+              aria-label="Phone number"
               value={contact}
               onChange={(e) => {
                 setContact(e.target.value);
@@ -437,7 +436,7 @@ function AddModal({
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-black hover:bg-teal-600 active:scale-95 transition-all shadow-lg shadow-teal-200 disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Create Records ✓"}
+            {saving ? "Saving…" : "Create customer"}
           </button>
         </div>
       </div>
@@ -455,6 +454,7 @@ function AddPetModal({
   onClose: () => void;
   onAdd: (p: Pet) => void;
 }) {
+  const panelRef = useModalFocus(onClose);
   const [petName, setPetName] = useState("");
   const [petType, setPetType] = useState("Dog");
   const [contact, setContact] = useState(customer.pets[0]?.contact ?? "");
@@ -498,6 +498,11 @@ function AddPetModal({
 
   return (
     <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add pet"
+      data-admin-panel="true"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(15,15,15,0.5)", backdropFilter: "blur(4px)" }}
     >
@@ -505,9 +510,17 @@ function AddPetModal({
         className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
         style={{ animation: "popIn .18s ease-out" }}
       >
+        <button
+          type="button"
+          className="pm-icon-button pm-panel-close"
+          onClick={onClose}
+          aria-label="Close panel"
+        >
+          <Icon name="close" size={16} />
+        </button>
         <div className="px-7 pt-6 pb-4 border-b border-stone-100 flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center text-xl shadow-lg shadow-teal-200">
-            🐾
+            <Icon name="paw" size={22} />
           </div>
           <div>
             <h2 className="text-lg font-black text-stone-800">
@@ -528,6 +541,7 @@ function AddPetModal({
               Pet Name *
             </label>
             <input
+              aria-label="Pet name"
               value={petName}
               onChange={(e) => {
                 setPetName(e.target.value);
@@ -544,6 +558,7 @@ function AddPetModal({
             </label>
             <input
               list="pt-addpet"
+              aria-label="Pet type"
               value={petType}
               onChange={(e) => setPetType(e.target.value)}
               placeholder="e.g. Dog, Cat…"
@@ -560,6 +575,7 @@ function AddPetModal({
               Contact
             </label>
             <input
+              aria-label="Phone number"
               value={contact}
               onChange={(e) => setContact(e.target.value)}
               placeholder="e.g. 91234567"
@@ -601,6 +617,7 @@ function AddApptModal({
 }) {
   const today = new Date().toISOString().split("T")[0];
   const dayName = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const panelRef = useModalFocus(onClose);
   const [day, setDay] = useState(dayName);
   const [date, setDate] = useState(today);
   const [type, setType] = useState("");
@@ -661,6 +678,11 @@ function AddApptModal({
 
   return (
     <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="New visit"
+      data-admin-panel="true"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(15,15,15,0.5)", backdropFilter: "blur(4px)" }}
     >
@@ -668,10 +690,18 @@ function AddApptModal({
         className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
         style={{ animation: "popIn .18s ease-out" }}
       >
+        <button
+          type="button"
+          className="pm-icon-button pm-panel-close"
+          onClick={onClose}
+          aria-label="Close panel"
+        >
+          <Icon name="close" size={16} />
+        </button>
         <div className="px-7 pt-6 pb-4 border-b border-stone-100">
           <h2 className="text-lg font-black text-stone-800">Log a Visit</h2>
           <p className="text-xs text-stone-400 mt-0.5">
-            Saved directly to database
+            Record grooming details and package usage.
           </p>
         </div>
         <div
@@ -829,7 +859,7 @@ function AddApptModal({
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-black hover:bg-teal-600 active:scale-95 transition-all shadow-lg shadow-teal-200 disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Add Visit ✓"}
+            {saving ? "Saving…" : "Save visit"}
           </button>
         </div>
       </div>
@@ -838,6 +868,34 @@ function AddApptModal({
 }
 
 // ─── Pet Detail ───────────────────────────────────────────────────────────────
+// Row wrapper for info tab
+const Row = ({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) => (
+  <div className="grid grid-cols-5 gap-3 items-start py-3 border-b border-stone-100 last:border-0">
+    <div className="col-span-2">
+      <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">
+        {label}
+      </p>
+      {hint && <p className="text-[10px] text-stone-300 mt-0.5">{hint}</p>}
+    </div>
+    <div className="col-span-3">{children}</div>
+  </div>
+);
+const Txt = ({ v }: { v: string | number | null }) => (
+  <p
+    className={`text-sm ${v ? "text-stone-700 font-medium" : "text-stone-300 italic"}`}
+  >
+    {v || "Not specified"}
+  </p>
+);
+
 function PetDetail({
   customer,
   pet: initPet,
@@ -944,34 +1002,6 @@ function PetDetail({
   const totalSessions = pet.appointments.reduce((s, a) => s + (a.pUse || 0), 0);
   const visitCount = pet.appointments.filter((a) => a.date).length;
 
-  // Row wrapper for info tab
-  const Row = ({
-    label,
-    hint,
-    children,
-  }: {
-    label: string;
-    hint?: string;
-    children: React.ReactNode;
-  }) => (
-    <div className="grid grid-cols-5 gap-3 items-start py-3 border-b border-stone-100 last:border-0">
-      <div className="col-span-2">
-        <p className="text-xs font-bold text-stone-400 uppercase tracking-wide">
-          {label}
-        </p>
-        {hint && <p className="text-[10px] text-stone-300 mt-0.5">{hint}</p>}
-      </div>
-      <div className="col-span-3">{children}</div>
-    </div>
-  );
-  const Txt = ({ v }: { v: string | number | null }) => (
-    <p
-      className={`text-sm ${v ? "text-stone-700 font-medium" : "text-stone-300 italic"}`}
-    >
-      {v || "Not specified"}
-    </p>
-  );
-
   return (
     <div className="min-h-screen bg-stone-50">
       <div className="bg-white border-b border-stone-100 sticky top-0 z-20">
@@ -989,6 +1019,7 @@ function PetDetail({
           <div className="flex gap-2">
             {!editing ? (
               <button
+                aria-label="Edit pet information"
                 onClick={() => setEditing(true)}
                 className="px-4 py-1.5 rounded-xl bg-teal-500 text-white text-sm font-black hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-200"
               >
@@ -1010,7 +1041,7 @@ function PetDetail({
                   disabled={saving}
                   className="px-4 py-1.5 rounded-xl bg-teal-500 text-white text-sm font-black hover:bg-teal-600 active:scale-95 transition-all shadow-sm shadow-teal-200 disabled:opacity-60"
                 >
-                  {saving ? "Saving…" : "Save ✓"}
+                  {saving ? "Saving…" : "Save changes"}
                 </button>
               </>
             )}
@@ -1066,7 +1097,7 @@ function PetDetail({
           </div>
           {saved && (
             <div className="mt-3 px-4 py-2 bg-teal-50 rounded-xl text-teal-600 text-sm font-bold">
-              ✓ Saved to database
+              Changes saved
             </div>
           )}
           {currentPLeft <= 1 &&
@@ -1131,6 +1162,7 @@ function PetDetail({
             <Row label="Pet Name">
               {editing ? (
                 <input
+                  aria-label="Pet name"
                   value={fPetName}
                   onChange={(e) => setFPetName(e.target.value)}
                   className={INPUT_SM}
@@ -1144,6 +1176,7 @@ function PetDetail({
                 <>
                   <input
                     list="pt-edit"
+                    aria-label="Pet type"
                     value={fPetType}
                     onChange={(e) => setFPetType(e.target.value)}
                     className={INPUT_SM}
@@ -1161,6 +1194,7 @@ function PetDetail({
             <Row label="Breed" hint="e.g. Golden Retriever">
               {editing ? (
                 <input
+                  aria-label="Breed"
                   value={fBreed}
                   onChange={(e) => setFBreed(e.target.value)}
                   className={INPUT_SM}
@@ -1173,6 +1207,7 @@ function PetDetail({
               {editing ? (
                 <input
                   type="number"
+                  aria-label="Age"
                   value={fAge}
                   onChange={(e) => setFAge(e.target.value)}
                   className={INPUT_SM}
@@ -1184,6 +1219,7 @@ function PetDetail({
             <Row label="Address">
               {editing ? (
                 <textarea
+                  aria-label="Address"
                   value={fAddress}
                   onChange={(e) => setFAddress(e.target.value)}
                   rows={3}
@@ -1196,6 +1232,7 @@ function PetDetail({
             <Row label="Medical History" hint="Conditions, allergies">
               {editing ? (
                 <textarea
+                  aria-label="Medical history"
                   value={fMedical}
                   onChange={(e) => setFMedical(e.target.value)}
                   rows={3}
@@ -1208,6 +1245,7 @@ function PetDetail({
             <Row label="Contact">
               {editing ? (
                 <input
+                  aria-label="Phone number"
                   value={fContact}
                   onChange={(e) => setFContact(e.target.value)}
                   className={INPUT_SM}
@@ -1219,6 +1257,7 @@ function PetDetail({
             <Row label="Preferred Groomer">
               {editing ? (
                 <input
+                  aria-label="Preferred groomer"
                   value={fGroomer}
                   onChange={(e) => setFGroomer(e.target.value)}
                   className={INPUT_SM}
@@ -2405,7 +2444,24 @@ export default function PetMan({
 }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
-  const [view, setView] = useState("list");
+  const { view, setView } = useContext(AdminNavigation);
+  const router = useRouter();
+  useEffect(() => {
+    const section = router.query.section;
+    setView(
+      typeof section === "string" &&
+        [
+          "list",
+          "members",
+          "accounts",
+          "backup",
+          "deleted",
+          "dashboard",
+        ].includes(section)
+        ? section
+        : "list",
+    );
+  }, [router.query.section, setView]);
   const [selected, setSelected] = useState<{
     customer: Customer | null;
     pet: Pet | null;
@@ -2456,7 +2512,9 @@ export default function PetMan({
         style={{ background: "linear-gradient(160deg,#f0faf9,#e0f2ef)" }}
       >
         <div className="text-center">
-          <div className="text-4xl mb-3 animate-pulse">🐾</div>
+          <div className="text-4xl mb-3 animate-pulse">
+            <Icon name="paw" size={22} />
+          </div>
           <p className="text-stone-400 font-semibold text-sm">Loading…</p>
         </div>
       </div>
@@ -2471,20 +2529,6 @@ export default function PetMan({
       <CustomerPortal userId={session.user.id} onSignOut={() => signOut()} />
     );
   }
-
-  const filtered = customers
-    .filter(
-      (c) =>
-        c.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        c.customerId.toLowerCase().includes(search.toLowerCase()) ||
-        c.pets.some((p) =>
-          p.petName.toLowerCase().includes(search.toLowerCase()),
-        ),
-    )
-    .sort((a, b) => {
-      const cmp = a.customerName.localeCompare(b.customerName);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
 
   const handleAdd = (nc: Customer) => {
     setCustomers((p) => [...p, nc]);
@@ -2510,15 +2554,20 @@ export default function PetMan({
     if (!customer) return;
 
     // Save snapshot to deleted_customers BEFORE deleting
-    await database.from("deleted_customers").insert({
+    const snapshot = await database.from("deleted_customers").insert({
       original_id: customer.id,
       customer_id: customer.customerId,
       customer_name: customer.customerName,
       snapshot: customer, // full JSON: name, customerId, pets[], appointments[]
     });
+    if (snapshot.error) return;
 
     // Now delete (cascade removes pets + appointments)
-    await database.from("customers").delete().eq("id", customerId);
+    const deleted = await database
+      .from("customers")
+      .delete()
+      .eq("id", customerId);
+    if (deleted.error) return;
     setCustomers((p) => p.filter((c) => c.id !== customerId));
   };
 
@@ -2540,211 +2589,90 @@ export default function PetMan({
           : c,
       ),
     );
-    setSelected((s) => ({ ...s, pet: updatedPet }));
+    setSelected((s) => ({
+      ...s,
+      pet: updatedPet,
+      customer:
+        s.customer?.id === cId
+          ? {
+              ...s.customer,
+              pets: s.customer.pets.map((p) =>
+                p.id === updatedPet.id ? updatedPet : p,
+              ),
+            }
+          : s.customer,
+    }));
   };
 
-  const totalPets = customers.reduce((s, c) => s + c.pets.length, 0);
-
-  if (view === "backup") return <BackupPage onBack={() => setView("list")} />;
-
+  if (view === "backup")
+    return (
+      <div className="admin-legacy">
+        <BackupPage onBack={() => setView("list")} />
+      </div>
+    );
   if (view === "deleted")
     return (
-      <DeletedLog onBack={() => setView("list")} onRestore={handleRestore} />
+      <div className="admin-legacy">
+        <DeletedLog onBack={() => setView("list")} onRestore={handleRestore} />
+      </div>
     );
-
   if (view === "dashboard")
     return (
-      <DashboardPage
-        onBack={() => setView("list")}
-        onGoMembers={() => setView("members")}
-      />
-    );
-
-  if (view === "members") return <MembersPage onBack={() => setView("list")} />;
-
-  if (view === "accounts")
-    return <AccountsPage onBack={() => setView("list")} session={session} />;
-
-  if (view === "detail" && selected.customer && selected.pet)
-    return (
-      <PetDetail
-        customer={selected.customer}
-        pet={selected.pet}
-        onBack={() => setView("list")}
-        onSave={handleSavePet}
-      />
-    );
-
-  return (
-    <div
-      className="min-h-screen"
-      style={{ background: "linear-gradient(160deg,#f8faf9,#eef4f2)" }}
-    >
-      <div className="bg-white border-b border-stone-100 shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-          {/* Top row: logo + actions */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-teal-500 flex items-center justify-center text-xl sm:text-2xl shadow-lg shadow-teal-200 flex-shrink-0">
-                🐾
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-stone-800 tracking-tight">
-                  PetMan
-                </h1>
-                <p className="text-xs text-stone-400">
-                  <span className="font-bold text-teal-600">
-                    {customers.length}
-                  </span>{" "}
-                  customers ·{" "}
-                  <span className="font-bold text-teal-600">{totalPets}</span>{" "}
-                  pets
-                </p>
-              </div>
-            </div>
-
-            {/* Desktop buttons */}
-            <div className="hidden lg:flex items-center gap-2">
-              <a
-                href="/bookings"
-                className="px-3 py-3 rounded-xl border border-stone-200 text-sm font-semibold text-teal-800"
-              >
-                Bookings
-              </a>
-              <a
-                href="/staff"
-                className="px-3 py-3 rounded-xl border border-stone-200 text-sm font-semibold text-teal-800"
-              >
-                Users
-              </a>
-              <button
-                onClick={() => setView("dashboard")}
-                className="px-3 py-2 rounded-2xl border border-stone-200 text-sm font-semibold text-stone-500 hover:bg-stone-50 transition-all"
-                title="Dashboard"
-              >
-                📊
-              </button>
-              <button
-                onClick={() => setView("members")}
-                className="px-3 py-2 rounded-2xl border border-stone-200 text-sm font-semibold text-stone-500 hover:bg-stone-50 transition-all"
-                title="Members"
-              >
-                🏅
-              </button>
-              <button
-                onClick={() => setView("accounts")}
-                className="px-3 py-2 rounded-2xl border border-stone-200 text-sm font-semibold text-stone-500 hover:bg-stone-50 transition-all"
-                title="Customer Accounts"
-              >
-                🔑
-              </button>
-              <button
-                onClick={() => setShowModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-teal-500 text-white font-black text-sm hover:bg-teal-600 active:scale-95 transition-all shadow-lg shadow-teal-200 whitespace-nowrap"
-              >
-                + Add Customer
-              </button>
-              <button
-                onClick={() => setView("backup")}
-                className="px-3 py-2 rounded-2xl border border-stone-200 text-sm font-semibold text-stone-500 hover:bg-stone-50 transition-all"
-              >
-                💾
-              </button>
-              <button
-                onClick={() => setView("deleted")}
-                className="px-3 py-2 rounded-2xl border border-stone-200 text-sm font-semibold text-stone-500 hover:bg-stone-50 transition-all"
-              >
-                🗑
-              </button>
-              <button
-                onClick={() => signOut()}
-                className="px-3 py-2 rounded-2xl border border-stone-200 text-sm font-semibold text-stone-500 hover:bg-stone-50 transition-all"
-              >
-                ↩
-              </button>
-            </div>
-
-            {/* Mobile: just + button + menu */}
-            <div className="flex lg:hidden items-center gap-2">
-              <button
-                onClick={() => setShowModal(true)}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-teal-500 text-white font-black text-sm hover:bg-teal-600 active:scale-95 transition-all shadow-md shadow-teal-200"
-              >
-                + Add
-              </button>
-              <MobileMenu
-                onBackup={() => setView("backup")}
-                onDeleted={() => setView("deleted")}
-                onDashboard={() => setView("dashboard")}
-                onMembers={() => setView("members")}
-                onAccounts={() => setView("accounts")}
-                onSignOut={() => signOut()}
-              />
-            </div>
-          </div>
-
-          {/* Search + Sort */}
-          <div className="mt-3 flex gap-2">
-            <div className="relative flex-1">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">
-                🔍
-              </span>
-              <input
-                type="text"
-                placeholder="Search customers or pets…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-stone-200 text-sm bg-stone-50 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 focus:bg-white transition-all"
-              />
-            </div>
-            <button
-              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-2xl border border-stone-200 bg-stone-50 hover:bg-white text-sm font-bold text-stone-600 hover:border-teal-300 hover:text-teal-600 transition-all whitespace-nowrap"
-            >
-              {sortDir === "asc" ? "A→Z" : "Z→A"}
-            </button>
-          </div>
-        </div>
+      <div className="admin-legacy">
+        <DashboardPage
+          onBack={() => setView("list")}
+          onGoMembers={() => setView("members")}
+        />
       </div>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-7">
-        {dataLoading ? (
-          <div className="text-center py-20">
-            <div className="text-4xl mb-3 animate-pulse">🐾</div>
-            <p className="text-stone-400 font-semibold text-sm">
-              Loading customers…
-            </p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-3">🐾</p>
-            <p className="text-stone-400 font-bold text-lg">
-              {search ? "No results found" : "No customers yet"}
-            </p>
-            {!search && (
-              <p className="text-stone-300 text-sm mt-1">
-                Tap "+ Add" to get started
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((c) => (
-              <CustomerCard
-                key={c.id}
-                customer={c}
-                onDelete={handleDeleteCustomer}
-                onAddPet={(c) => setAddPetFor(c)}
-                onSelectPet={(cu, p) => {
-                  setSelected({ customer: cu, pet: p });
-                  setView("detail");
-                }}
-              />
+    );
+  if (view === "members")
+    return (
+      <div className="admin-legacy">
+        <MembersPage onBack={() => setView("list")} />
+      </div>
+    );
+  if (view === "accounts")
+    return (
+      <div className="admin-legacy">
+        <AccountsPage onBack={() => setView("list")} session={session} />
+      </div>
+    );
+  return (
+    <>
+      <CustomerWorkspace
+        customers={customers}
+        onAdd={() => setShowModal(true)}
+        onAddPet={setAddPetFor}
+        onOpen={(customer, pet) => {
+          setSelected({ customer, pet });
+          setView("detail");
+        }}
+        onDelete={handleDeleteCustomer}
+      />
+      {view === "detail" && selected.customer && selected.pet && (
+        <Drawer title={selected.pet.petName} onClose={() => setView("list")}>
+          <div className="pm-pet-tabs">
+            {selected.customer.pets.map((p) => (
+              <button
+                key={p.id}
+                className={selected.pet?.id === p.id ? "is-active" : ""}
+                onClick={() => setSelected((s) => ({ ...s, pet: p }))}
+              >
+                {p.petName}
+              </button>
             ))}
           </div>
-        )}
-      </div>
-
+          <div className="pm-pet-record">
+            <PetDetail
+              key={selected.pet.id}
+              customer={selected.customer}
+              pet={selected.pet}
+              onBack={() => setView("list")}
+              onSave={handleSavePet}
+            />
+          </div>
+        </Drawer>
+      )}
       {showModal && (
         <AddModal onClose={() => setShowModal(false)} onAdd={handleAdd} />
       )}
@@ -2755,7 +2683,6 @@ export default function PetMan({
           onAdd={handleAddPet}
         />
       )}
-      <style>{`@keyframes popIn{from{opacity:0;transform:scale(.95) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
-    </div>
+    </>
   );
 }

@@ -1,3 +1,5 @@
+import Icon from "@/components/Icon";
+import { useModalFocus } from "@/components/Drawer";
 import { useState, useEffect, useCallback } from "react";
 import { database } from "@/lib/database";
 
@@ -93,7 +95,7 @@ function TierBadge({ tier }: { tier: Tier | null }) {
     <span
       className={`inline-flex items-center gap-1 text-xs font-black px-2.5 py-0.5 rounded-full ${colors[tier.name] ?? "bg-stone-100 text-stone-600"}`}
     >
-      {tier.icon} {tier.name}
+      {tier.name}
     </span>
   );
 }
@@ -207,6 +209,7 @@ function MemberModal({
   onClose: () => void;
   onSave: (updated: Member) => void;
 }) {
+  const panelRef = useModalFocus(onClose);
   const [email, setEmail] = useState(member.email ?? "");
   const [dob, setDob] = useState(member.date_of_birth ?? "");
   const [consent, setConsent] = useState(member.marketing_consent);
@@ -285,6 +288,11 @@ function MemberModal({
 
   return (
     <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Edit membership"
+      data-admin-panel="true"
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(15,15,15,0.5)", backdropFilter: "blur(4px)" }}
     >
@@ -292,6 +300,14 @@ function MemberModal({
         className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto"
         style={{ animation: "popIn .18s ease-out" }}
       >
+        <button
+          type="button"
+          className="pm-icon-button pm-panel-close"
+          onClick={onClose}
+          aria-label="Close panel"
+        >
+          <Icon name="close" size={16} />
+        </button>
         {/* Header */}
         <div className="px-7 pt-6 pb-4 border-b border-stone-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -441,7 +457,7 @@ function MemberModal({
                     <strong className="text-stone-700">
                       RM {spendToNext.toFixed(0)} more
                     </strong>{" "}
-                    to reach {nextTier.icon} <strong>{nextTier.name}</strong> (
+                    to reach <strong>{nextTier.name}</strong> (
                     {nextTier.discount_pct}% discount)
                   </p>
                 ) : (
@@ -469,7 +485,7 @@ function MemberModal({
                             : "border-stone-100 bg-stone-50 opacity-60"
                         }`}
                       >
-                        <span className="text-xl">{t.icon}</span>
+                        <Icon name="award" size={18} />
                         <div className="flex-1">
                           <p className="text-sm font-black text-stone-800">
                             {t.name}
@@ -517,7 +533,7 @@ function MemberModal({
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-black hover:bg-teal-600 active:scale-95 transition-all shadow-lg shadow-teal-200 disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save Member ✓"}
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
@@ -657,174 +673,163 @@ export default function MembersPage({ onBack }: { onBack: () => void }) {
   const marketingCount = members.filter((m) => m.marketing_consent).length;
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "linear-gradient(160deg,#f8faf9,#eef4f2)" }}
-    >
-      {/* Header */}
-      <div className="bg-white border-b border-stone-100 shadow-sm sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onBack}
-                className="w-9 h-9 rounded-xl border border-stone-200 flex items-center justify-center text-stone-500 hover:bg-stone-50 hover:text-teal-600 transition-all text-sm font-bold"
+    <div className="pm-members-page">
+      <div className="pm-stats">
+        {[
+          [
+            "Recorded spend",
+            "RM " + totalRevenue.toFixed(2),
+            "All customer visits",
+          ],
+          ["Birthdays this month", String(birthdayCount), "Customer birthdays"],
+          ["Marketing opt-ins", String(marketingCount), "Consent recorded"],
+        ].map(([label, value, sub], i) => (
+          <section className="pm-stat" key={label}>
+            <div className="pm-stat-label">
+              <span
+                className={"pm-stat-icon " + ["blue", "orange", "green"][i]}
               >
-                ←
-              </button>
-              <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center text-xl shadow-lg shadow-teal-200">
-                🏅
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-stone-800 tracking-tight">
-                  Members
-                </h1>
-                <p className="text-xs text-stone-400">
-                  <span className="font-bold text-teal-600">
-                    {members.length}
-                  </span>{" "}
-                  members ·{" "}
-                  <span className="font-bold text-teal-600">
-                    RM {totalRevenue.toFixed(0)}
-                  </span>{" "}
-                  total revenue
-                </p>
-              </div>
+                <Icon
+                  name={i === 0 ? "chart" : i === 1 ? "calendar" : "mail"}
+                  size={18}
+                />
+              </span>
+              {label}
             </div>
+            <div className="pm-stat-bottom">
+              <strong>{value}</strong>
+              <span>{sub}</span>
+            </div>
+          </section>
+        ))}
+      </div>
+      <section className="pm-table-card">
+        <div className="pm-table-toolbar">
+          <div>
+            <h2>
+              Membership directory <span>{members.length}</span>
+            </h2>
+            <p>Birthdays, spending tiers and communication preferences.</p>
           </div>
-
-          {/* Search */}
-          <div className="mt-3 relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">
-              🔍
-            </span>
+        </div>
+        <div className="pm-table-controls pm-members-controls">
+          <label className="pm-search">
+            <Icon name="search" size={17} />
             <input
-              type="text"
-              placeholder="Search by name, ID or email…"
+              aria-label="Search memberships"
+              placeholder="Search by name, reference or email…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-stone-200 text-sm bg-stone-50 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 focus:bg-white transition-all"
             />
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 space-y-5">
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            {
-              label: "Total Revenue",
-              val: `RM ${totalRevenue.toFixed(0)}`,
-              icon: "💰",
-              color: "teal",
-            },
-            {
-              label: "Birthdays this month",
-              val: birthdayCount.toString(),
-              icon: "🎂",
-              color: "pink",
-            },
-            {
-              label: "Inactive (60d+)",
-              val: inactiveCount.toString(),
-              icon: "⏰",
-              color: "amber",
-            },
-            {
-              label: "Marketing opted in",
-              val: marketingCount.toString(),
-              icon: "✉",
-              color: "blue",
-            },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="bg-white rounded-3xl border border-stone-100 shadow-sm p-4 text-center"
-            >
-              <p className="text-2xl mb-1">{s.icon}</p>
-              <p className="text-xl font-black text-stone-800">{s.val}</p>
-              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wide leading-tight mt-0.5">
-                {s.label}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2">
-          {/* Tier filter */}
-          <div className="flex flex-wrap gap-1.5">
-            {["all", "Bronze", "Silver", "Gold", "Platinum", "none"].map(
-              (t) => (
-                <button
-                  key={t}
-                  onClick={() => setFilterTier(t)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                    filterTier === t
-                      ? "bg-teal-500 text-white shadow-sm shadow-teal-200"
-                      : "bg-white border border-stone-200 text-stone-500 hover:border-teal-300"
-                  }`}
-                >
-                  {t === "all" ? "All tiers" : t === "none" ? "No tier" : t}
-                </button>
-              ),
-            )}
-          </div>
-
-          {/* Flag filter */}
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { val: "all", label: "All" },
-              { val: "birthday", label: "🎂 Birthday" },
-              { val: "inactive", label: "⏰ Inactive" },
-              { val: "marketing", label: "✉ Marketing on" },
-              { val: "nodob", label: "No DOB" },
-            ].map((f) => (
-              <button
-                key={f.val}
-                onClick={() => setFilterFlag(f.val)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  filterFlag === f.val
-                    ? "bg-stone-700 text-white"
-                    : "bg-white border border-stone-200 text-stone-500 hover:border-stone-400"
-                }`}
-              >
-                {f.label}
-              </button>
+          </label>
+          <select
+            aria-label="Membership tier"
+            value={filterTier}
+            onChange={(e) => setFilterTier(e.target.value)}
+          >
+            <option value="all">All tiers</option>
+            {tiers.map((t) => (
+              <option key={t.id} value={t.name}>
+                {t.name}
+              </option>
             ))}
-          </div>
+          </select>
+          <select
+            aria-label="Member filter"
+            value={filterFlag}
+            onChange={(e) => setFilterFlag(e.target.value)}
+          >
+            <option value="all">All members</option>
+            <option value="birthday">Birthday this month</option>
+            <option value="inactive">Inactive customers</option>
+            <option value="marketing">Marketing consent</option>
+          </select>
         </div>
-
-        {/* Member list */}
-        {loading ? (
-          <div className="text-center py-20">
-            <div className="text-4xl mb-3 animate-pulse">🏅</div>
-            <p className="text-stone-400 font-semibold text-sm">
-              Loading members…
+        <div className="pm-table-scroll">
+          <table className="pm-data-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Membership</th>
+                <th>Birthday</th>
+                <th>Marketing</th>
+                <th className="pm-right">Total spend</th>
+                <th className="pm-right">Visits</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((m) => (
+                <tr key={m.customer_id}>
+                  <td>
+                    <button
+                      className="pm-customer-name"
+                      onClick={() => setSelected(m)}
+                    >
+                      <span className="pm-avatar">
+                        {m.customer_name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .slice(0, 2)
+                          .join("")}
+                      </span>
+                      <span>
+                        <strong>{m.customer_name}</strong>
+                        <small>{m.email || m.customer_ref}</small>
+                      </span>
+                    </button>
+                  </td>
+                  <td>
+                    <span className="pm-status member">
+                      <i />
+                      {m.tier?.name ?? "Not enrolled"}
+                    </span>
+                  </td>
+                  <td>{formatDate(m.date_of_birth)}</td>
+                  <td>
+                    <span
+                      className={
+                        "pm-status " +
+                        (m.marketing_consent ? "member" : "neutral")
+                      }
+                    >
+                      <i />
+                      {m.marketing_consent ? "Opted in" : "Not opted in"}
+                    </span>
+                  </td>
+                  <td className="pm-right pm-amount">
+                    RM {m.total_spend.toFixed(2)}
+                  </td>
+                  <td className="pm-right">{m.visit_count}</td>
+                  <td>
+                    <button
+                      className="pm-icon-button"
+                      aria-label={"Edit membership for " + m.customer_name}
+                      onClick={() => setSelected(m)}
+                    >
+                      <Icon name="chevron" size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!filtered.length && (
+          <div className="pm-empty">
+            <Icon name="award" size={30} />
+            <h3>{loading ? "Loading memberships…" : "No members found"}</h3>
+            <p>
+              Customer records appear here. Open a profile to add birthday and
+              contact details.
             </p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-3">🏅</p>
-            <p className="text-stone-400 font-bold text-lg">No members found</p>
-            <p className="text-stone-300 text-sm mt-1">
-              Try adjusting your filters
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((m) => (
-              <MemberCard
-                key={m.customer_id}
-                member={m}
-                onClick={() => setSelected(m)}
-              />
-            ))}
           </div>
         )}
-      </div>
-
+        <div className="pm-table-footer">
+          <span>{filtered.length} members</span>
+          <span>{inactiveCount} customers inactive for over 60 days</span>
+        </div>
+      </section>
       {selected && (
         <MemberModal
           member={selected}
@@ -833,8 +838,6 @@ export default function MembersPage({ onBack }: { onBack: () => void }) {
           onSave={handleSave}
         />
       )}
-
-      <style>{`@keyframes popIn{from{opacity:0;transform:scale(.95) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
     </div>
   );
 }
