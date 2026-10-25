@@ -416,6 +416,19 @@ app.notFound((c) =>
     : c.env.ASSETS.fetch(c.req.raw),
 );
 app.onError((error, c) => {
+  const readable = [
+    "Payment exceeds balance",
+    "Refund exceeds collected amount",
+    "Invoice is void",
+    "Discount exceeds subtotal",
+    "Invoice total is too large",
+    "Payment request ID already used",
+    "Customer not found",
+    "Pet does not belong to this customer",
+    "Recovery record not found",
+    "Customer is already active",
+  ].find((message) => error.message.includes(message));
+  if (readable) return c.json({ error: readable }, 400);
   if (error instanceof BookingError)
     return c.json({ error: error.message }, error.status);
   if (error instanceof z.ZodError)

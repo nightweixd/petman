@@ -44,6 +44,11 @@ type Detail = {
   notes: Note[];
   tasks: Task[];
   invoices: Invoice[];
+  member: {
+    email: string;
+    date_of_birth: string | null;
+    marketing_consent: number;
+  }[];
   bookings: { id: string; date: string; slot: string; status: string }[];
 };
 type View = { id: string; name: string; query: string };
@@ -323,6 +328,30 @@ export default function Care() {
               </p>
             ))}
             {!detail.bookings.length && <p>No linked bookings.</p>}
+          </section>
+          <section className="ops-section">
+            <h3>Membership</h3>
+            {detail.member[0] ? (
+              <>
+                <p>
+                  {detail.member[0].email || "No membership email recorded"}
+                </p>
+                <p>
+                  Birthday: {detail.member[0].date_of_birth || "Not recorded"}
+                </p>
+                <p>
+                  Marketing consent:{" "}
+                  {detail.member[0].marketing_consent
+                    ? "Granted"
+                    : "Not granted"}
+                </p>
+              </>
+            ) : (
+              <p>No saved membership profile.</p>
+            )}
+            <Link className="pm-text-button" href="/?section=members">
+              Membership tiers & benefits
+            </Link>
           </section>
           <section className="ops-section">
             <h3>Invoices</h3>
