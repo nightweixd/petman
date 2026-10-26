@@ -25,7 +25,7 @@
   // Preview bindings are explicit: never connect PR builds to live customer data.
   "previews": {
     "vars": {
-      "APP_ORIGIN": "https://codex-salon-management-invoices-petman.fongjunweii.workers.dev",
+      "APP_ORIGIN": "https://codex-soft-ui-refresh-petman.fongjunweii.workers.dev",
       "BUSINESS_TIMEZONE": "Asia/Kuala_Lumpur",
     },
     "d1_databases": [

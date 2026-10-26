@@ -92,7 +92,7 @@ npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-m
 
 The preview schema is initialized through migration 0003. Apply future migrations
 with the command above; keep its database ID and `previews.d1_databases` in sync.
-`previews.vars.APP_ORIGIN` currently matches the `codex/customer-portal-booking` branch URL. For another
+`previews.vars.APP_ORIGIN` currently matches the `codex/soft-ui-refresh` branch URL. For another
 branch, override it to that preview's exact HTTPS origin when deploying:
 
 ```powershell

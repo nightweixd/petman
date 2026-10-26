@@ -3,6 +3,7 @@ import "@fontsource-variable/manrope";
 import "@/styles/admin.css";
 import "@/styles/operations.css";
 import "@/styles/customer.css";
+import "@/styles/theme.css";
 import AdminShell, { AdminNavigation } from "@/components/AdminShell";
 import { useRouter } from "next/router";
 import type { AppProps } from "next/app";
