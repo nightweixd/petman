@@ -1174,9 +1174,6 @@ body:has(.pm-shell) {
 .pm-shell .rounded-2xl {
   border-radius: 9px !important;
 }
-.pm-shell [class*="shadow"] {
-  box-shadow: none !important;
-}
 .pm-shell .bg-teal-500,
 .pm-shell .bg-teal-600 {
   background: var(--pm-blue) !important;

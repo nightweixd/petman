@@ -4,8 +4,8 @@ export default function Setup() {
     [done, setDone] = useState(false),
     [busy, setBusy] = useState(false);
   return (
-    <main className="min-h-screen bg-teal-50 flex items-center justify-center p-6">
-      <section className="bg-white rounded-2xl shadow p-8 w-full max-w-md">
+    <main className="pm-login pm-setup">
+      <section className="pm-login-card">
         <h1 className="text-2xl font-bold mb-3">Set up PetMan</h1>
         <p className="text-stone-600 mb-6">
           Create the first administrator. Setup is available once and requires

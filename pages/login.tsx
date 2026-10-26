@@ -4,6 +4,7 @@ import Link from "next/link";
 import Head from "next/head";
 import CustomerLayout from "@/components/CustomerLayout";
 import Icon from "@/components/Icon";
+import PetIllustration from "@/components/PetIllustration";
 import { signIn, type Session } from "@/lib/database";
 
 export default function CustomerLogin({
@@ -50,6 +51,7 @@ export default function CustomerLogin({
       </Head>
       <main className="pc-login-grid">
         <section className="pc-login-story">
+          <PetIllustration className="pc-login-pet" />
           <p className="pc-eyebrow">Your pet's little corner</p>
           <h1>
             Good care starts

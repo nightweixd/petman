@@ -3,6 +3,7 @@ import Link from "next/link";
 import Head from "next/head";
 import CustomerLayout from "@/components/CustomerLayout";
 import Icon from "@/components/Icon";
+import PetIllustration from "@/components/PetIllustration";
 import CustomerLogin from "./login";
 import { signOut, type Session } from "@/lib/database";
 import {
@@ -94,6 +95,7 @@ export default function CustomerPortal({
           data && (
             <>
               <section className="pc-welcome">
+                <PetIllustration className="pc-welcome-pet" />
                 <div>
                   <span className="pc-icon-tile">
                     <Icon name="paw" size={27} />

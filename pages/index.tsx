@@ -5,6 +5,7 @@ import { AdminNavigation } from "@/components/AdminShell";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
 import Drawer, { useModalFocus } from "@/components/Drawer";
 import Icon from "@/components/Icon";
+import PetIllustration from "@/components/PetIllustration";
 import { useState, useEffect, useCallback, useContext } from "react";
 import type { Session } from "@/lib/database";
 import {
@@ -163,58 +164,91 @@ function LoginScreen() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { error } = await signIn(email, password);
-    if (error) setError(error.message ?? "Unable to sign in");
-    setLoading(false);
+    try {
+      const { error } = await signIn(email, password);
+      if (error) setError(error.message ?? "Unable to sign in");
+    } catch {
+      setError("Unable to sign in. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <main className="pm-login">
-      <section className="pm-login-card">
-        <div className="pm-login-brand">
-          <span>
-            <Icon name="paw" size={24} />
-          </span>
-          <strong>PetMan</strong>
-        </div>
-        <h1>Sign in to your workspace</h1>
-        <p>Manage customers, appointments and memberships.</p>
-        <form onSubmit={handleLogin}>
-          <label htmlFor="login-email">Email address</label>
-          <input
-            id="login-email"
-            type="email"
-            autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoFocus
-          />
-          <label htmlFor="login-password">Password</label>
-          <input
-            id="login-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          {error && (
-            <p role="alert" className="pm-login-error">
-              {error}
-            </p>
-          )}
-          <button type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-        <a href="/book">
-          Looking to book an appointment? <Icon name="arrow" size={14} />
-        </a>
-        <a href="/login">
-          Customer account sign in <Icon name="arrow" size={14} />
-        </a>
-      </section>
+      <div className="pm-login-panel">
+        <aside className="pm-login-story">
+          <div className="pm-story-brand">
+            <Icon name="paw" size={25} />
+            <strong>PetMan</strong>
+          </div>
+          <span className="pm-welcome-tag">Made for the people who care.</span>
+          <h2>
+            Happy pets.
+            <br />A calmer kind of workday.
+          </h2>
+          <p>
+            From the first hello to the finishing touches, keep every little
+            detail together.
+          </p>
+          <PetIllustration />
+          <div className="pm-login-features">
+            <span>
+              <Icon name="calendar" size={16} />
+              Thoughtful scheduling
+            </span>
+            <span>
+              <Icon name="paw" size={16} />
+              Connected care
+            </span>
+          </div>
+        </aside>
+        <section className="pm-login-card">
+          <div className="pm-login-brand">
+            <span>
+              <Icon name="paw" size={24} />
+            </span>
+            <strong>PetMan</strong>
+          </div>
+          <h1>Your day starts here.</h1>
+          <p>Welcome back. Sign in to your salon workspace.</p>
+          <form onSubmit={handleLogin}>
+            <label htmlFor="login-email">Email address</label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+            />
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            {error && (
+              <p role="alert" className="pm-login-error">
+                {error}
+              </p>
+            )}
+            <button type="submit" disabled={loading}>
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+          <a href="/book">
+            Looking to book an appointment? <Icon name="arrow" size={14} />
+          </a>
+          <a href="/login">
+            Customer account sign in <Icon name="arrow" size={14} />
+          </a>
+        </section>
+      </div>
     </main>
   );
 }
@@ -248,10 +282,26 @@ function AddModal({
     }
 
     setSaving(true);
-    let created: {customerId:string;customerRef:string;petId:string};
-    try { created=await workspaceApi('/new-customer',{customerName:customerName.trim(),customerRef:customerId.trim(),petName:petName.trim(),petType,phone:contact.trim()}); }
-    catch(error){setErrors({customerName:error instanceof Error?error.message:'Unable to create customer'});setSaving(false);return;}
-    const cId=created.customerRef,cData={id:created.customerId},pData={id:created.petId};
+    let created: { customerId: string; customerRef: string; petId: string };
+    try {
+      created = await workspaceApi("/new-customer", {
+        customerName: customerName.trim(),
+        customerRef: customerId.trim(),
+        petName: petName.trim(),
+        petType,
+        phone: contact.trim(),
+      });
+    } catch (error) {
+      setErrors({
+        customerName:
+          error instanceof Error ? error.message : "Unable to create customer",
+      });
+      setSaving(false);
+      return;
+    }
+    const cId = created.customerRef,
+      cData = { id: created.customerId },
+      pData = { id: created.petId };
 
     onAdd({
       id: cData.id,
@@ -2171,11 +2221,26 @@ export default function PetMan({
   };
 
   const handleDeleteCustomer = async (customerId: string) => {
-    try {await workspaceApi('/customers/'+customerId+'/archive',{});}catch(error){window.dispatchEvent(new CustomEvent('petman-error',{detail:error instanceof Error?error.message:'Unable to archive customer'}));return;}
+    try {
+      await workspaceApi("/customers/" + customerId + "/archive", {});
+    } catch (error) {
+      window.dispatchEvent(
+        new CustomEvent("petman-error", {
+          detail:
+            error instanceof Error
+              ? error.message
+              : "Unable to archive customer",
+        }),
+      );
+      return;
+    }
     setCustomers((p) => p.filter((c) => c.id !== customerId));
   };
 
-  const handleRestore = () => {void loadData();setView('list');};
+  const handleRestore = () => {
+    void loadData();
+    setView("list");
+  };
 
   const handleSavePet = (cId: string, updatedPet: Pet) => {
     setCustomers((p) =>

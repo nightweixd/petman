@@ -2,6 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import Icon, { type IconName } from "./Icon";
+import PetIllustration from "./PetIllustration";
 import { signOut, type Session } from "@/lib/database";
 export const AdminNavigation = createContext({
   view: "list",
@@ -85,6 +86,9 @@ export default function AdminShell({
       <aside className="pm-rail" aria-label="Main navigation">
         <Link href="/" className="pm-brand" aria-label="PetMan customers">
           <Icon name="paw" size={23} />
+          <span>
+            PetMan<small>Made for better care</small>
+          </span>
         </Link>
         <span className="pm-rail-rule" />
         <nav>
@@ -203,7 +207,25 @@ export default function AdminShell({
             </Link>
           </div>
         </header>
-        <div className="pm-page">{children}</div>
+        <div className="pm-page">
+          {["list", "dashboard"].includes(active) && (
+            <section className="pm-welcome-banner">
+              <div>
+                <span className="pm-welcome-tag">
+                  <span />
+                  Your salon, in good hands
+                </span>
+                <h2>Good to see you, {session.user.name.split(" ")[0]}.</h2>
+                <p>A little organisation. A lot more happy tails.</p>
+                <Link href="/today" className="pm-welcome-link">
+                  See today's appointments <Icon name="chevron" size={16} />
+                </Link>
+              </div>
+              <PetIllustration className="pm-welcome-pet" />
+            </section>
+          )}
+          {children}
+        </div>
         <footer className="pm-footer">
           <span>PetMan</span>
           <span>Customer care, all in one place.</span>
